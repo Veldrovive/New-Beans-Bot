@@ -159,6 +159,29 @@ class RoleNameConfig(StrictModel):
     allow_self_voting: bool = True
 
 
+class DayPassConfig(StrictModel):
+    role_id: int
+    cost: CoinAmount = parse_amount(2)
+    length: datetime.timedelta = datetime.timedelta(days=1)  # Hydra/YAML: seconds, or ISO 8601 like "PT24H"
+    purchase_scripts: list[str] = []  # {buyer}
+    expire_scripts: list[str] = []  # {member}
+
+
+class OnePercentConfig(StrictModel):
+    role_id: int
+    starting_price: CoinAmount = parse_amount(10)  # The price before anyone has claimed it
+    price_increment: CoinAmount = parse_amount(1)  # The next price is what the holder paid plus this
+    first_claim_scripts: list[str] = []  # {buyer}, {paid}, {new_price}
+    usurp_scripts: list[str] = []  # {buyer}, {previous_holder}, {paid}, {new_price}
+
+
+class VipConfig(StrictModel):
+    """Two roles that both see the VIP channel (set up in Discord): a day pass, and one permanent title."""
+
+    day_pass: DayPassConfig
+    one_percent: OnePercentConfig
+
+
 class GuildConfig(StrictModel):
     name: str
     active: bool = True
@@ -172,6 +195,7 @@ class GuildConfig(StrictModel):
     fat_cow: FatCowConfig | None = None
     classifier: ClassifierGuildConfig | None = None
     role_name: RoleNameConfig | None = None
+    vip: VipConfig | None = None
 
 
 # --- Root -----------------------------------------------------------------------------

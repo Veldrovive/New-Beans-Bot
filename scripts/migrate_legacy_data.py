@@ -589,9 +589,8 @@ def verify(session: Session, migration: Migration, report: Report) -> None:
     written: Counter[str] = Counter()
     for _, table, _, count in report.rows:
         written[table] += count
-    models = {m.__tablename__: m for m in SQLModel.__subclasses__() if hasattr(m, "__table__")}  # type: ignore[attr-defined]
     for table, expected in sorted(written.items()):
-        actual = session.exec(select(func.count()).select_from(models[table])).one()
+        actual = session.exec(select(func.count()).select_from(SQLModel.metadata.tables[table])).one()
         report.check(f"{table} row count", actual == expected, f"expected {expected}, found {actual}")
 
     # Balances match the old bot exactly (in base units), and every account's ledger adds up to its balance.

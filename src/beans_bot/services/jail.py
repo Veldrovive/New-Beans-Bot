@@ -132,8 +132,8 @@ class JailService:
             result = await session.exec(
                 update(JailSentence)
                 .where(
-                    JailSentence.guild_id == guild_id,
-                    JailSentence.user_id == user_id,
+                    col(JailSentence.guild_id) == guild_id,
+                    col(JailSentence.user_id) == user_id,
                     col(JailSentence.released_at).is_(None),
                 )
                 .values(released_at=utcnow(), release_reason=reason)
@@ -145,7 +145,7 @@ class JailService:
         async with self.db.transaction() as session:
             result = await session.exec(
                 update(JailSentence)
-                .where(JailSentence.id == sentence_id, JailSentence.humiliated == False)  # noqa: E712
+                .where(col(JailSentence.id) == sentence_id, col(JailSentence.humiliated) == False)  # noqa: E712
                 .values(humiliated=True)
             )
             return result.rowcount > 0
@@ -166,7 +166,7 @@ class JailService:
             result = await session.exec(
                 select(JailSentence.user_id, count)
                 .where(JailSentence.guild_id == guild_id)
-                .group_by(JailSentence.user_id)
+                .group_by(col(JailSentence.user_id))
                 .order_by(count.desc())
                 .limit(limit)
             )

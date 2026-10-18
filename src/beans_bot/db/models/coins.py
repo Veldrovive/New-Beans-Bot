@@ -23,6 +23,8 @@ class CoinTransactionKind(StrEnum):
     BET_REFUND = "bet_refund"  # Market escrow -> bettor
     BET_PAYOUT = "bet_payout"  # Market escrow -> winner
     HOUSE_REMAINDER = "house_remainder"  # Market escrow -> house (rounding leftovers)
+    VIP_DAY_PASS = "vip_day_pass"  # Member -> house
+    VIP_ONE_PERCENT = "vip_one_percent"  # Member -> house, to claim the one permanent VIP title
     MIGRATION_OPENING = "migration_opening"  # Balance carried over from the old bot
 
 

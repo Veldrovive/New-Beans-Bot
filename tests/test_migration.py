@@ -13,6 +13,7 @@ from beans_bot.db.models import CoinAccount, JailSentence, MarketBet, Prediction
 
 SCRIPT = Path(__file__).parent.parent / "scripts" / "migrate_legacy_data.py"
 spec = importlib.util.spec_from_file_location("migrate_legacy_data", SCRIPT)
+assert spec is not None and spec.loader is not None
 migration = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = migration
 spec.loader.exec_module(migration)
@@ -126,7 +127,8 @@ def test_migration_passes_checks(legacy, tmp_path):
     balances = {(a.guild_id, a.user_id): a.balance for a in session.exec(select(CoinAccount))}
     assert balances == {(G1, 1): 400, (G1, 2): 100, (G1, BOT): -700}
     assert {(b.user_id, b.amount) for b in session.exec(select(MarketBet))} == {(1, 200), (BOT, 300)}
-    assert session.get(PredictionMarket, 40).choices == ["yes", "no"]
+    market = session.get(PredictionMarket, 40)
+    assert market is not None and market.choices == ["yes", "no"]
 
     sentences = session.exec(select(JailSentence)).all()
     current = {(s.guild_id, s.user_id) for s in sentences if s.released_at is None}

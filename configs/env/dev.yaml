@@ -194,3 +194,29 @@ guilds:
       student_role_id: 1437112395204919336
       required_votes: 1
       allow_self_voting: true
+    # VIP: both roles can see the VIP channel (set up in Discord), nobody else can.
+    vip:
+      day_pass:
+        role_id: 1561511987978960947  # "Aristocrat"
+        cost: 2
+        length: 86400
+        purchase_scripts:
+        - "{buyer} has joined the aristocracy for a day!"
+        - "{buyer} has purchased a day of luxury. They shall eat cake!"
+        - "Make way! {buyer} has rented a monocle and a top hat for the day."
+        - "{buyer} has temporarily escaped the proletariat. Enjoy it while it lasts."
+        expire_scripts:
+        - "{member}'s day pass has expired. Welcome back to the proletariat."
+        - "The bouncer has escorted {member} out of the VIP lounge. Come back when you have more coin."
+        - "{member}'s carriage has turned back into a pumpkin."
+      one_percent:
+        role_id: 1561512039518699621  # "The 1%"
+        starting_price: 10
+        price_increment: 1
+        first_claim_scripts:
+        - "{buyer} has bought their way to the top of the food chain for {paid}. Anyone wanting the crown must pay {new_price}."
+        usurp_scripts:
+        - "{buyer} has usurped {previous_holder} as the most irresponsible spender. The new price is {new_price}."
+        - "{previous_holder} has been thrown out of the penthouse! {buyer} paid {paid} to take their place. The new price is {new_price}."
+        - "{previous_holder}'s yacht has been repossessed. {buyer} is the 1% now. The new price is {new_price}."
+        - "Eat the rich! {previous_holder} has fallen and {buyer} has risen, {paid} poorer. The new price is {new_price}."

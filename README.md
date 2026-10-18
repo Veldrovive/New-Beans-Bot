@@ -5,6 +5,7 @@ A Discord bot for the beans server. It's a rewrite of `robot_discord_robot`:
 - **Jail:** enough jail emoji reactions put a message's author in the stocks. Jailed members get humiliated, tomatoed, and at the mega jail threshold renamed by the crowd.
 - **Tomatoes:** throw them at jailed members, or get scolded for hitting an innocent.
 - **BeanCoins:** earned when others react to your messages with the coin emoji. Spend them on bribes and bets.
+- **VIP:** spend BeanCoins on a role that sees the VIP channel: a day pass into the bourgeoisie, or the one permanent "1%" title, which anyone can usurp by paying more than its holder did.
 - **Prediction markets:** betting pools on threads in the gambling forum, with pari-mutuel payouts.
 - **Birthdays, action holidays, fat cow stats, the robotics student role poll,** and the **image classifier** (cats and moods).
 

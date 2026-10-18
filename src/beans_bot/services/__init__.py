@@ -11,6 +11,7 @@ from beans_bot.services.coins import CoinService
 from beans_bot.services.gemini import GeminiService
 from beans_bot.services.jail import JailService
 from beans_bot.services.markets import MarketService
+from beans_bot.services.vip import VipService
 
 
 @dataclass
@@ -21,6 +22,7 @@ class Services:
     coins: CoinService
     jail: JailService
     markets: MarketService
+    vip: VipService
     gemini: GeminiService
 
     @classmethod
@@ -35,5 +37,6 @@ class Services:
             coins=coins,
             jail=JailService(db),
             markets=MarketService(db, coins),
+            vip=VipService(db, coins),
             gemini=GeminiService(config.gemini),
         )

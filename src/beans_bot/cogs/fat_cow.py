@@ -92,7 +92,7 @@ class FatCowCog(BeansCog):
                 await session.exec(
                     select(FatCowConsumption.user_id, total, func.count(col(FatCowConsumption.id)))
                     .where(FatCowConsumption.guild_id == guild_id)
-                    .group_by(FatCowConsumption.user_id)
+                    .group_by(col(FatCowConsumption.user_id))
                     .order_by(total.desc())
                 )
             ).all()

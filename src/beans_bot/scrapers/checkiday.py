@@ -64,7 +64,7 @@ def scrape_holidays(html_content: str, day: int, month: int) -> list[Holiday]:
                 type=HolidayType.SINGLE_DAY,
                 name=name,
                 description=desc_tag.text.strip() if desc_tag else "No description available",
-                link=title_tag.a["href"],
+                link=str(title_tag.a["href"]),
                 day=day,
                 month=month,
             )
@@ -81,7 +81,7 @@ def scrape_holidays(html_content: str, day: int, month: int) -> list[Holiday]:
                 type=HolidayType.MULTI_DAY,
                 name=primary.a.text.strip(),
                 description=sub_title.text.strip() if sub_title else "No description available",
-                link=primary.a["href"],
+                link=str(primary.a["href"]),
                 day=day,
                 month=month,
             )

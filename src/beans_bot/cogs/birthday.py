@@ -74,12 +74,12 @@ class BirthdayCog(BeansCog):
         now = datetime.datetime.now(self.config.tz)
         holidays = await checkiday.get_holidays(now.day, now.month, now.year)
         self.logger.info(f"Test scrapers (birthday): Found {len(holidays)} holidays today.")
-        if holidays and (answer := await checkiday.ask_best_holiday(holidays, self.services.gemini)):
-            self.logger.info(f"Test scrapers (birthday): Best holiday: {answer[1].name} because {answer[0]}")
+        if holidays and (best_holiday := await checkiday.ask_best_holiday(holidays, self.services.gemini)):
+            self.logger.info(f"Test scrapers (birthday): Best holiday: {best_holiday[1].name} because {best_holiday[0]}")
         events = await onthisday.get_on_this_day(now.day, now.month)
         self.logger.info(f"Test scrapers (birthday): Found {len(events)} on this day events today.")
-        if events and (answer := await onthisday.ask_best_event(events, self.services.gemini)):
-            self.logger.info(f"Test scrapers (birthday): Best on this day: {answer[1].description} because {answer[0]}")
+        if events and (best_event := await onthisday.ask_best_event(events, self.services.gemini)):
+            self.logger.info(f"Test scrapers (birthday): Best on this day: {best_event[1].description} because {best_event[0]}")
 
     async def run_all(self) -> None:
         for guild in self.bot.guilds:
