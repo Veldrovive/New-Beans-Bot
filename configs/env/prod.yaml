@@ -1,0 +1,210 @@
+# @package _global_
+# Ported from the old bot's config_prod.yaml. Times are in seconds.
+
+guilds:
+  1435668295410782290:
+    name: Real Server
+    active: true
+    bot_channel_id: 1441539591856197684
+    jail:
+      jail_emoji: tojail
+      tomato_emoji: 🍅
+      to_jail_threshold: 3
+      mega_jail_threshold: 5
+      jail_length: 86400
+      jailed_role_id: 1469122341496688790
+      subsequent_tomato_probability: 0.1
+      on_jailed_scripts:
+      - Hark! {jailed_user} has been sent to the stocks for heinous speech!
+      - Hah! Mock {jailed_user} thus! Forsooth, unto the stocks they hath been led!
+      - Aha! Attend to the pillory, that thou mayest receive thy just chastisement!
+      - Thou shalt be send to prisone, forsooth, for thine grievous trespasses!
+      mega_jail_scripts:
+      - The people have spoken. {jailed_user}'s name is forfeit. The first reply to this message will be their new name.
+      humiliate_scripts:
+      - Silence {jailed_user}! I throw a tomato at thee!
+      - Take a tomato unto thine head!
+      - Halt thy prattling!
+      - Quiete thy voice and be still.
+      - Hark ye, be ye mute as stone.
+      already_in_jail_scripts:
+      - Alas! {jailed_user} is already in jail! How can they be double jailed?
+      release_scripts:
+      - Alright, {jailed_user}. You've served your time. Don't let it happen again.
+      scot_free_scripts:
+      - What are you doing in the stocks {jailed_user}? You're free to go.
+      forgotten_prisoner_scripts:
+      - You're not on the lists {jailed_user}. Well you must be here for a reason. Back in the stocks!
+      assault_innocent_scripts:
+      - HALT {reacting_user}! You have tomatoed the innocent {attacked_user}! I will remember this!
+      bribe:
+        cost: 10
+        success_scripts:
+        - The honorable {bot_name} has decided that {jailed_user} is innocent of their crime and must be released immediately!
+        - Huzzah! The coffers overflow! Coincidentally {jailed_user} walks free!
+        - Ah! The bars doth found themselves open! {jailed_user} hath made haste!
+        - What ho, a mighty persuasion! Take thou stealth as thou walkest forsooth!
+        failure_scripts:
+        - FOR SHAME! {jailed_user} has attempted to bribe your competent and faithful bot! Tomato them!
+        - Did you think I could be bought so easily, {jailed_user}? Double the guard!
+        - Thine coin doth not fill mine pocket enough!
+        - How darest thou seek to purchase mine acceptance with a paltry sum!
+        - Wouldest thou seek to corrupt me with coin? A curse upon thee, villain!
+    coins:
+      emoji: BeanCoin
+      reaction_value: 1
+      max_reactions_per_day: 2
+    gambling:
+      forum_channel_id: 1524436342665248898
+      bot_betting:
+        enabled: true
+        bet_probability: 1.0
+        bet_proportion: 0.1
+        max_bet: 50
+        min_bet_range:
+        - 1
+        - 4
+    birthday:
+      birthdays_message_channel_id: 1435678059138121788
+      birthdays_message_id: 1491511145511518318
+      enable_holidays: true
+      enable_on_this_day: true
+    action_holiday: {}
+    fat_cow:
+      reactions:
+        no_fat_cow_emoji: knife
+        low_fat_cow_threshold: 0.5
+        low_fat_cow_emoji: cow
+        medium_fat_cow_threshold: 1.0
+        medium_fat_cow_emoji: 🇬,🇴,🅾️,🇩
+        high_fat_cow_threshold: 1.5
+        high_fat_cow_emoji: 🇭,🇴,🇼,❓
+        very_high_fat_cow_emoji: tojail
+    classifier:
+      models:
+        cats:
+          model_path: cats
+          auto_respond_channels:
+          - 1441539591856197684
+          manual_trigger_reaction: 🐱
+          confidence_thresholds:
+            HIGH: 0.68
+            MID: 0.4
+            LOW: 0.0
+          select_random_prob: 0.4
+          scripts:
+          - priority: 10
+            label: andy
+            confidence: HIGH
+            text: '"Oh wacky tobacky this is Andy!" - Connor'
+          - priority: 10
+            label: andy
+            confidence: HIGH
+            text: Andy! Go to sleep!
+          - priority: 10
+            label: andy
+            confidence: HIGH
+            text: Take your bets if Andy's leaving FRB before it's tomorrow
+          - priority: 10
+            label: bean
+            confidence: HIGH
+            text: Send bean pics
+          - priority: 10
+            label: bean
+            confidence: HIGH
+            text: Hey, when are you doing playdate?
+          - priority: 10
+            label: harvey
+            confidence: HIGH
+            text: Harvey! Outside of a couch! It's more likely than you think.
+          - priority: 10
+            label: harvey
+            confidence: HIGH
+            text: Oh Harvey, please stop being a menace at night
+          - priority: 10
+            label: levi
+            confidence: HIGH
+            text: It's the perfect princess Laverne!
+          - priority: 10
+            label: merlin
+            confidence: HIGH
+            text: Watch your feet Merlin's here
+          - priority: 10
+            label: merlin
+            confidence: HIGH
+            text: STINKY!
+          - priority: 10
+            label: merlin
+            confidence: HIGH
+            text: Get put in air jail!
+          - priority: 10
+            label: merlin
+            confidence: HIGH
+            text: He demand the pank!
+          - priority: 10
+            label: wrigley
+            confidence: HIGH
+            text: I can hear Wrigley purring from here!
+          - priority: 10
+            label: wrigley
+            confidence: HIGH
+            text: Whoa, you got some big paws there Wrigley!
+          - priority: 0
+            label: ANY
+            confidence: HIGH
+            text: AWWWW it's {cats_label_1}!
+          - priority: 0
+            label: ANY
+            confidence: MID
+            text: Could it be! Is it {cats_label_1}?! Or wait is it {cats_label_2}?
+          - priority: 0
+            label: ANY
+            confidence: LOW
+            text: Who is this man? {cats_label_1}?
+        emotions:
+          model_path: emotions
+          auto_respond_channels:
+          - 1441539591856197684
+          manual_trigger_reaction: 😄
+          confidence_thresholds:
+            HIGH: 0.68
+            MID: 0.4
+            LOW: 0.0
+          select_random_prob: 0.4
+          scripts:
+          - priority: 10
+            label: angy
+            confidence: HIGH
+            text: Oh? Somebody is angy!
+          - priority: 10
+            label: needy
+            confidence: HIGH
+            text: Looks like someone needs attention!
+          - priority: 10
+            label: eepy
+            confidence: HIGH
+            text: Time for sleep (˘o˘ )
+          - priority: 10
+            label: hungy
+            confidence: HIGH
+            text: FOOD! GIVE!
+          - priority: 10
+            label: andy
+            confidence: HIGH
+            text: Feelin a bit andy today.
+          - priority: 0
+            label: ANY
+            confidence: HIGH
+            text: Whoof, that's {emotions_label_1}!
+          - priority: 0
+            label: ANY
+            confidence: MID
+            text: Could it be! Is it {emotions_label_1}?! Or wait is it {emotions_label_2}?
+          - priority: 0
+            label: ANY
+            confidence: LOW
+            text: Someone's feeling {emotions_label_1}? Or is it {emotions_label_2}?
+    role_name:
+      student_role_id: 1435671205293064254
+      required_votes: 1
+      allow_self_voting: true

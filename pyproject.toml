@@ -1,0 +1,64 @@
+[project]
+name = "beans-bot"
+version = "0.1.0"
+description = "Discord bot for the beans server: jail, BeanCoins, prediction markets, birthdays and more."
+readme = "README.md"
+authors = [
+    { name = "Aidan Dempster", email = "aidan.dempster@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "alembic>=1.20.0",
+    "beautifulsoup4>=4.15.0",
+    "dateparser>=1.4.3",
+    "discord-py>=2.6.4",
+    "emoji>=2.16.0",
+    "google-genai>=2.31.0",
+    "greenlet>=3.5.6",
+    "httpx>=0.28.1",
+    "hydra-core>=1.3.7",
+    "pydantic>=2.14.1",
+    "python-dotenv>=1.2.4",
+    "sqlmodel>=0.0.48",
+]
+
+[project.optional-dependencies]
+classifier = [
+    "accelerate>=1.15.0",
+    "huggingface-hub>=2.2.0",
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.4",
+    "opencv-python-headless>=5.0.0.93",
+    "pillow>=13.0.0",
+    "pillow-heif>=1.8.1",
+    "scikit-learn==1.7.2",
+    "torch>=2.14.1",
+    "torchvision>=0.29.1",
+    "tqdm>=4.70.1",
+    "transformers>=5.20.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.32,<0.12.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+# Linux (Docker) installs the CPU-only torch build instead of the multi-GB CUDA one.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

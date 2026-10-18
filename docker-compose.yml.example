@@ -1,0 +1,19 @@
+# Copy to docker-compose.yml (which is git-ignored) and fill in the secrets, or put them in .env.
+services:
+  bot:
+    build: .
+    volumes:
+      - ./data:/app/data          # beans.db lives here
+      - ./configs:/app/configs    # Edit guild config without rebuilding
+      - ./logs:/app/logs
+      - hf-cache:/root/.cache/huggingface  # DINOv3 weights for the classifier
+    environment:
+      - BOT_TOKEN=${BOT_TOKEN}
+      - HF_TOKEN=${HF_TOKEN}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL}
+      - GEMINI_THINKING_LEVEL=${GEMINI_THINKING_LEVEL}
+    restart: unless-stopped
+
+volumes:
+  hf-cache:

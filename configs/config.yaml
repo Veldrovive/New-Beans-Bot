@@ -1,0 +1,34 @@
+# Root hydra config. Pick the guild set with `env=dev` (default) or `env=prod`.
+# Secrets come from environment variables (or a .env file loaded by scripts/run_bot.py).
+defaults:
+  - env: dev
+  - _self_
+
+bot_token: ${oc.env:BOT_TOKEN}
+db_path: data/beans.db
+timezone: America/Detroit
+daily_post_time: "10:00"  # Birthday and action holiday posts, in `timezone`
+sync_commands_on_startup: true
+log_level: INFO
+
+currency:
+  cheddar_enabled: true
+
+gemini:
+  api_key: ${oc.env:GEMINI_API_KEY,null}
+  model: ${oc.env:GEMINI_MODEL,null}
+  thinking_level: ${oc.env:GEMINI_THINKING_LEVEL,null}
+  required: true
+
+classifier:
+  enabled: true
+  models_dir: models/classifier
+  device: cpu
+  torch_cpu_threads: 1
+  hf_token: ${oc.env:HF_TOKEN,null}
+
+hydra:
+  run:
+    dir: logs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  job:
+    chdir: false

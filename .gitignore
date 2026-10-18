@@ -1,0 +1,21 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Bot runtime
+/.pytest_cache
+/tasks
+.env
+data/
+logs/
+outputs/
+docker-compose.yml
+models/classifier/cache/
+models/classifier/datasets/

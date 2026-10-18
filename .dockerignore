@@ -1,0 +1,9 @@
+.venv
+.git
+.env
+data/
+logs/
+outputs/
+models/classifier/cache/
+models/classifier/datasets/
+**/__pycache__

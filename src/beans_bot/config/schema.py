@@ -1,0 +1,215 @@
+"""
+Pydantic schema for the bot config.
+
+Hydra composes the YAML in ./configs, then scripts/run_bot.py validates the
+resolved result with BotConfig. Names follow the Discord API docs: what the
+Discord UI calls a "server" is a "guild" here.
+"""
+
+from __future__ import annotations
+
+import datetime
+import zoneinfo
+from pathlib import Path
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, SecretStr, field_validator
+
+from beans_bot.currency import parse_amount
+
+# A coin amount written in the config. Bare numbers are BeanCoins ("10" = 10 BeanCoins),
+# or a unit can be given ("5 cheddar"). Stored as base units.
+CoinAmount = Annotated[int, BeforeValidator(lambda v: parse_amount(v))]
+
+
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+# --- Global ---------------------------------------------------------------------------
+
+
+class GeminiConfig(StrictModel):
+    api_key: SecretStr | None = None
+    model: str | None = None
+    thinking_level: str | None = None
+    # When true the bot refuses to start if Gemini does not answer a test prompt.
+    required: bool = True
+
+    @property
+    def enabled(self) -> bool:
+        return self.api_key is not None and bool(self.api_key.get_secret_value()) and self.model is not None
+
+
+class ClassifierGlobalConfig(StrictModel):
+    enabled: bool = True
+    models_dir: Path = Path("models/classifier")
+    device: str = "cpu"
+    torch_cpu_threads: int = 1
+    hf_token: SecretStr | None = None
+
+
+class CurrencyConfig(StrictModel):
+    cheddar_enabled: bool = False
+
+
+# --- Per guild ------------------------------------------------------------------------
+
+
+class BribeConfig(StrictModel):
+    cost: CoinAmount
+    success_scripts: list[str] = []  # {bot_name}, {jailed_user}
+    failure_scripts: list[str] = []  # {bot_name}, {jailed_user}
+
+
+class JailConfig(StrictModel):
+    jail_emoji: str
+    tomato_emoji: str
+    to_jail_threshold: int
+    mega_jail_threshold: int
+    jail_length: datetime.timedelta  # Hydra/YAML: seconds, or ISO 8601 like "PT24H"
+    jailed_role_id: int
+    subsequent_tomato_probability: float = 0.1
+    desync_release_probability: float = 0.5
+
+    on_jailed_scripts: list[str] = []  # {jailed_user}
+    mega_jail_scripts: list[str] = []  # {jailed_user}
+    humiliate_scripts: list[str] = []  # {jailed_user}
+    assault_innocent_scripts: list[str] = []  # {reacting_user}, {attacked_user}
+    already_in_jail_scripts: list[str] = []  # {jailed_user}
+    release_scripts: list[str] = []  # {jailed_user}
+    scot_free_scripts: list[str] = []  # {jailed_user}: had the role but no record, set free
+    forgotten_prisoner_scripts: list[str] = []  # {jailed_user}: had the role but no record, re-jailed
+
+    bribe: BribeConfig | None = None
+
+
+class CoinsConfig(StrictModel):
+    emoji: str
+    reaction_value: CoinAmount = parse_amount(1)
+    max_reactions_per_day: int
+    max_message_age: datetime.timedelta = datetime.timedelta(days=3)
+
+
+class BotBettingConfig(StrictModel):
+    enabled: bool = False
+    bet_probability: float = 0.5
+    bet_proportion: float = 0.1
+    max_bet: CoinAmount = parse_amount(50)
+    min_bet_range: tuple[CoinAmount, CoinAmount] = (parse_amount(1), parse_amount(4))
+
+
+class GamblingConfig(StrictModel):
+    forum_channel_id: int
+    bot_betting: BotBettingConfig = BotBettingConfig()
+
+
+class BirthdayConfig(StrictModel):
+    # The message that lists everyone's birthdays, one per line as "- Name: Month Day[, Year]".
+    birthdays_message_channel_id: int
+    birthdays_message_id: int
+    enable_holidays: bool = True
+    enable_on_this_day: bool = True
+
+
+class ActionHolidayConfig(StrictModel):
+    pass
+
+
+class FatCowReactions(StrictModel):
+    # Each emoji can be a comma-separated list. Entries can be custom guild emoji names,
+    # :alias: shortcodes, or unicode emoji.
+    no_fat_cow_emoji: str = ""
+    low_fat_cow_threshold: float = 0.5
+    low_fat_cow_emoji: str = "cow"
+    medium_fat_cow_threshold: float = 1.0
+    medium_fat_cow_emoji: str = ""
+    high_fat_cow_threshold: float = 1.5
+    high_fat_cow_emoji: str = ""
+    very_high_fat_cow_emoji: str = ""
+
+
+class FatCowConfig(StrictModel):
+    reactions: FatCowReactions = FatCowReactions()
+
+
+class ClassifierScript(StrictModel):
+    priority: int
+    label: str  # A model label, or "ANY"
+    confidence: str  # A key of confidence_thresholds
+    text: str  # May use {<model name>_label_<rank>}
+
+
+class ClassifierModelConfig(StrictModel):
+    model_path: str  # Relative to classifier.models_dir
+    auto_respond_channels: list[int] = []
+    manual_trigger_reaction: str | None = None
+    confidence_thresholds: dict[str, float]
+    select_random_prob: float = 0.0  # Otherwise pick the least recently used script
+    scripts: list[ClassifierScript]
+
+
+class ClassifierGuildConfig(StrictModel):
+    models: dict[str, ClassifierModelConfig]
+
+
+class RoleNameConfig(StrictModel):
+    student_role_id: int
+    required_votes: int = 1
+    allow_self_voting: bool = True
+
+
+class GuildConfig(StrictModel):
+    name: str
+    active: bool = True
+    bot_channel_id: int | None = None
+
+    jail: JailConfig | None = None
+    coins: CoinsConfig | None = None
+    gambling: GamblingConfig | None = None
+    birthday: BirthdayConfig | None = None
+    action_holiday: ActionHolidayConfig | None = None
+    fat_cow: FatCowConfig | None = None
+    classifier: ClassifierGuildConfig | None = None
+    role_name: RoleNameConfig | None = None
+
+
+# --- Root -----------------------------------------------------------------------------
+
+
+class BotConfig(StrictModel):
+    bot_token: SecretStr
+    db_path: Path = Path("data/beans.db")
+    timezone: str = "America/Detroit"
+    daily_post_time: datetime.time = datetime.time(hour=10)
+    sync_commands_on_startup: bool = True
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
+
+    currency: CurrencyConfig = CurrencyConfig()
+    gemini: GeminiConfig = GeminiConfig()
+    classifier: ClassifierGlobalConfig = ClassifierGlobalConfig()
+
+    guilds: dict[int, GuildConfig] = Field(default_factory=dict)
+
+    @field_validator("timezone")
+    @classmethod
+    def _valid_timezone(cls, v: str) -> str:
+        zoneinfo.ZoneInfo(v)
+        return v
+
+    @property
+    def tz(self) -> zoneinfo.ZoneInfo:
+        return zoneinfo.ZoneInfo(self.timezone)
+
+    @property
+    def daily_post_time_tz(self) -> datetime.time:
+        return self.daily_post_time.replace(tzinfo=self.tz)
+
+    def guild(self, guild_id: int | None) -> GuildConfig | None:
+        """Config for an active guild, or None if the guild is unknown or inactive."""
+        if guild_id is None:
+            return None
+        config = self.guilds.get(guild_id)
+        if config is None or not config.active:
+            return None
+        return config

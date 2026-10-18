@@ -1,0 +1,39 @@
+"""Services shared by every cog. The bot builds one Services and hands it to each cog."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from beans_bot.config.schema import BotConfig
+from beans_bot.currency import CurrencySystem
+from beans_bot.db.engine import Database
+from beans_bot.services.coins import CoinService
+from beans_bot.services.gemini import GeminiService
+from beans_bot.services.jail import JailService
+from beans_bot.services.markets import MarketService
+
+
+@dataclass
+class Services:
+    config: BotConfig
+    db: Database
+    currency: CurrencySystem
+    coins: CoinService
+    jail: JailService
+    markets: MarketService
+    gemini: GeminiService
+
+    @classmethod
+    def build(cls, config: BotConfig) -> Services:
+        db = Database(config.db_path)
+        currency = CurrencySystem(cheddar_enabled=config.currency.cheddar_enabled)
+        coins = CoinService(db, currency)
+        return cls(
+            config=config,
+            db=db,
+            currency=currency,
+            coins=coins,
+            jail=JailService(db),
+            markets=MarketService(db, coins),
+            gemini=GeminiService(config.gemini),
+        )
