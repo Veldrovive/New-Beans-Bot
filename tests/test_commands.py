@@ -27,7 +27,7 @@ async def test_commands_register(tmp_path: Path):
         names = {c.qualified_name for c in bot.tree.walk_commands()}
         assert {
             "ping", "admin sync", "robrole", "jail bribe", "jail current", "jail info", "jail leaderboard",
-            "coins wealth", "coins leaderboard", "bet place", "bet add", "bet stats", "bet close", "bet cancel",
+            "coins wealth", "coins leaderboard", "bet place", "bet add", "bet swap", "bet stats", "bet close", "bet cancel",
             "bet resolve", "botbet", "fatcow start", "fatcow consumed", "fatcow went", "fatcow leaderboard",
             "vip daypass", "vip onepercent", "vip status",
         } <= names  # fmt: skip

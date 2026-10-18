@@ -79,6 +79,44 @@ async def test_betting_rules(markets, coins, db, market):
     assert await coins.balance(GUILD, 1) == 100
 
 
+async def test_swap_moves_whole_bet(markets, coins, db, market):
+    await fund(coins, db, 1, 300)
+    await fund(coins, db, 2, 100)
+    await markets.place_bet(THREAD, 1, "yes", 100)
+    await markets.add_to_bet(THREAD, 1, 100)
+    await markets.place_bet(THREAD, 2, "no", 100)
+
+    swap = await markets.swap_bet(THREAD, 1, "NO")
+    assert swap.old_choice == "yes"
+    assert (swap.bet.choice, swap.bet.amount) == ("no", 200)
+    # The stake stays in the pool: no coins move.
+    assert await coins.balance(GUILD, 1) == 100
+    assert await coins.balance(GUILD, HOUSE) == 0
+    stats = await markets.stats(THREAD)
+    assert stats.by_choice == {"yes": 0, "no": 300}
+
+    # Everybody is on "no" now, so it resolves as a refund.
+    resolution = await markets.resolve(THREAD, CREATOR, "no")
+    assert resolution.refunded
+    assert await coins.balance(GUILD, 1) == 300
+
+
+async def test_swap_rules(markets, coins, db, market):
+    await fund(coins, db, 1, 100)
+    with pytest.raises(UserFacingError, match="never placed"):
+        await markets.swap_bet(THREAD, 1, "no")
+    await markets.place_bet(THREAD, 1, "yes", 100)
+    with pytest.raises(UserFacingError, match="already on"):
+        await markets.swap_bet(THREAD, 1, "yes")
+    with pytest.raises(UserFacingError, match="Invalid option"):
+        await markets.swap_bet(THREAD, 1, "maybe")
+    await markets.close(THREAD, CREATOR)
+    with pytest.raises(UserFacingError, match="currently closed"):
+        await markets.swap_bet(THREAD, 1, "no")
+    stats = await markets.stats(THREAD)
+    assert stats.by_choice == {"yes": 100, "no": 0}
+
+
 async def test_only_creator_manages(markets, market):
     with pytest.raises(UserFacingError, match="creator"):
         await markets.close(THREAD, 1)

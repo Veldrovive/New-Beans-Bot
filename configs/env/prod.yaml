@@ -64,6 +64,10 @@ guilds:
         min_bet_range:
         - 1
         - 4
+      swap_scripts:  # {member}, {old_choice}, {new_choice}, {amount}, {market}
+      - "{member} has betrayed {old_choice} and run off to {new_choice} with {amount} in {market}. They are in the stocks now. Tomatoes are encouraged."
+      - "FLIP-FLOPPER! {member} moved {amount} from {old_choice} to {new_choice} in {market}. Jail is where we keep people with no conviction."
+      - "Hear ye! {member} swore by {old_choice}, then crawled over to {new_choice} in {market}. Off to jail with the turncoat."
     birthday:
       birthdays_message_channel_id: 1435678059138121788
       birthdays_message_id: 1491511145511518318

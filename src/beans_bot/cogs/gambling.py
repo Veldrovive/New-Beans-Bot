@@ -2,6 +2,8 @@
 Prediction markets. A new thread in the guild's gambling forum, whose first
 message lists `Choices:`, becomes a betting pool. Members bet BeanCoins with
 /bet, and the thread's creator closes, cancels or resolves it.
+- /bet swap moves a member's whole bet to another choice, but it pings
+  @everyone in the bot channel and sends them to jail.
 """
 
 from __future__ import annotations
@@ -12,8 +14,10 @@ import random
 import discord
 from discord import app_commands
 
-from beans_bot.cogs.base import BeansCog, owner_only
+from beans_bot.cogs.base import BeansCog, owner_only, requires_feature
+from beans_bot.services import scripts
 from beans_bot.services.errors import UserFacingError
+from beans_bot.services.jail import JailOutcome
 from beans_bot.services.markets import InvalidMarket, parse_choices
 
 
@@ -23,6 +27,7 @@ def market_instructions(choices: list[str], creator_id: int) -> str:
     lines += [
         "You may only choose one option.",
         "However, if you want to lose more money you can use `/bet add` to increase your bet.",
+        "Changed your mind? `/bet swap` moves your whole bet, but it tells @everyone and sends you to jail.",
         "Check the pool and odds: `/bet stats`",
         "",
         f"Commands for the prediction market manager, <@{creator_id}>:",
@@ -157,6 +162,61 @@ class GamblingCog(BeansCog):
             f"{interaction.user.mention} added {currency.format(coins)} to their bet on **{bet.choice}**! "
             f"New total: {currency.format(bet.amount)}."
         )
+
+    @bet.command(
+        name="swap", description="Move your whole bet to another choice. Pings @everyone and sends you to jail."
+    )
+    @app_commands.describe(choice="The choice to move your whole bet to. Everyone will know, and you go to jail.")
+    @requires_feature("jail")
+    async def swap(self, interaction: discord.Interaction, choice: str):
+        assert interaction.guild is not None
+        config = self.guild_config(interaction.guild_id)
+        assert config is not None and config.jail is not None and config.gambling is not None
+        thread_id = self._thread_id(interaction)
+        # Swapping from a cell would be free, so it isn't allowed.
+        if await self.services.jail.is_jailed(interaction.guild.id, interaction.user.id):
+            raise UserFacingError("You're already in jail. Serve your time before you flip-flop again.")
+
+        swap = await self.services.markets.swap_bet(thread_id, interaction.user.id, choice)
+        currency = self.services.currency
+        await interaction.response.send_message(
+            f"{interaction.user.mention} has abandoned **{swap.old_choice}** and moved "
+            f"{currency.format(swap.bet.amount)} to **{swap.bet.choice}**. Traitor. To the stocks with you!"
+        )
+
+        result = await self.services.jail.imprison(
+            interaction.guild,
+            config.jail,
+            interaction.user.id,
+            channel_id=thread_id,
+            offending_message_id=None,
+            audit_reason="Swapped their bet.",
+        )
+        if result.outcome is not JailOutcome.JAILED:
+            self.logger.warning(f"Could not jail {interaction.user.id} for swapping in guild {interaction.guild.id}: {result.outcome}")
+
+        values = {
+            "member": interaction.user.mention,
+            "old_choice": swap.old_choice,
+            "new_choice": swap.bet.choice,
+            "amount": currency.format(swap.bet.amount),
+            "market": f"<#{thread_id}>",
+        }
+        text = scripts.pick(config.gambling.swap_scripts, **values) or (
+            f"{values['member']} switched their {values['amount']} bet in {values['market']} "
+            f"from **{values['old_choice']}** to **{values['new_choice']}**. Shame them."
+        )
+        channel = interaction.guild.get_channel(config.bot_channel_id) if config.bot_channel_id else None
+        if not isinstance(channel, discord.abc.Messageable):
+            channel = interaction.channel
+        if not isinstance(channel, discord.abc.Messageable):
+            return
+        try:
+            await channel.send(f"@everyone {text}", allowed_mentions=discord.AllowedMentions(everyone=True, users=True))
+        except discord.HTTPException:
+            self.logger.warning(f"Could not announce {interaction.user.id}'s bet swap in guild {interaction.guild.id}")
+
+    swap.autocomplete("choice")(_choice_autocomplete)
 
     @bet.command(name="stats", description="Show this market's pool and odds.")
     async def stats(self, interaction: discord.Interaction):

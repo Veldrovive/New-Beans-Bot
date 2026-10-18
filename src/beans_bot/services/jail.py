@@ -184,10 +184,33 @@ class JailService:
         if not await self.claim_message(guild.id, offending_message.id):
             return JailResult(JailOutcome.MESSAGE_ALREADY_USED)
 
+        result = await self.imprison(
+            guild,
+            config,
+            user_id,
+            channel_id=offending_message.channel.id,
+            offending_message_id=offending_message.id,
+            audit_reason="Sent to the stocks by popular vote.",
+        )
+        if result.outcome in (JailOutcome.MEMBER_NOT_FOUND, JailOutcome.ROLE_NOT_FOUND, JailOutcome.MISSING_PERMISSIONS):
+            # Nobody went to jail, so the message can still jail them later.
+            await self.unclaim_message(guild.id, offending_message.id)
+        return result
+
+    async def imprison(
+        self,
+        guild: discord.Guild,
+        config: JailConfig,
+        user_id: int,
+        *,
+        channel_id: int,
+        offending_message_id: int | None,
+        audit_reason: str,
+    ) -> JailResult:
+        """Give a member the jail role and start a sentence, for any reason (a voted message, a swapped bet)."""
         member = await get_member(guild, user_id)
         if member is None:
             logger.error(f"Could not find member {user_id} to jail in guild {guild.id}")
-            await self.unclaim_message(guild.id, offending_message.id)
             return JailResult(JailOutcome.MEMBER_NOT_FOUND)
 
         if await self.is_jailed(guild.id, user_id):
@@ -196,22 +219,20 @@ class JailService:
         role = guild.get_role(config.jailed_role_id)
         if role is None:
             logger.error(f"Jail role {config.jailed_role_id} not found in guild {guild.id}")
-            await self.unclaim_message(guild.id, offending_message.id)
             return JailResult(JailOutcome.ROLE_NOT_FOUND, member)
         try:
-            await member.add_roles(role, reason="Sent to the stocks by popular vote.")
+            await member.add_roles(role, reason=audit_reason)
         except discord.Forbidden:
-            await self.unclaim_message(guild.id, offending_message.id)
             return JailResult(JailOutcome.MISSING_PERMISSIONS, member)
 
         await self.start_sentence(
             guild_id=guild.id,
             user_id=user_id,
-            channel_id=offending_message.channel.id,
-            offending_message_id=offending_message.id,
+            channel_id=channel_id,
+            offending_message_id=offending_message_id,
             length=config.jail_length,
         )
-        logger.info(f"Jailed {user_id} in guild {guild.id} for message {offending_message.id}")
+        logger.info(f"Jailed {user_id} in guild {guild.id} ({audit_reason})")
         return JailResult(JailOutcome.JAILED, member)
 
     async def remove_role(self, guild: discord.Guild, config: JailConfig, member: discord.Member, reason: str) -> bool:

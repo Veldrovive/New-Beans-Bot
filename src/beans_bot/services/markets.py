@@ -4,6 +4,8 @@ Prediction markets: betting pools on threads in a guild's gambling forum.
 Payouts are pari-mutuel. Winners split the whole pool in proportion to their
 bets, rounded down to the smallest coin, and the house keeps what's left.
 If nobody (or everybody) picked the winner, every bet is refunded.
+Members can swap their whole bet to another choice while betting is open.
+The cog makes them pay for it with jail and an @everyone.
 """
 
 from __future__ import annotations
@@ -66,6 +68,12 @@ def parse_choices(content: str) -> list[str]:
 class MarketStats:
     pool: int
     by_choice: dict[str, int]
+
+
+@dataclass
+class Swap:
+    bet: MarketBet
+    old_choice: str
 
 
 @dataclass
@@ -252,6 +260,28 @@ class MarketService:
             await self._stake(session, market, user_id, amount)
             bet.amount += amount
             return bet
+
+    async def swap_bet(self, thread_id: int, user_id: int, choice: str) -> Swap:
+        """Move a member's whole bet to another choice. No coins move: the stake stays in the pool."""
+        choice = choice.lower()
+        async with self.db.transaction() as session:
+            market = await self._market(session, thread_id)
+            if market.status != MarketStatus.OPEN:
+                raise UserFacingError(f"Betting is currently {market.status}. Your bet is stuck where you put it.")
+            if choice not in market.choices:
+                raise UserFacingError(f"Invalid option '{choice}'. Valid choices: {', '.join(market.choices)}")
+            bet = await session.get(MarketBet, (thread_id, user_id))
+            if bet is None:
+                raise UserFacingError("You can't flip-flop on a bet you never placed. Use `/bet place` first.")
+            if bet.choice == choice:
+                raise UserFacingError(f"Your bet is already on **{choice}**. Nothing to swap, coward.")
+            swap = Swap(bet=bet, old_choice=bet.choice)
+            bet.choice = choice
+            logger.info(
+                f"{user_id} swapped their {bet.amount} bet on market {thread_id} in guild {market.guild_id} "
+                f"from {swap.old_choice} to {choice}"
+            )
+            return swap
 
     async def house_bet(self, thread_id: int, choice: str, amount: int) -> MarketBet:
         """

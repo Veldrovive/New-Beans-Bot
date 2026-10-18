@@ -102,6 +102,8 @@ class BotBettingConfig(StrictModel):
 class GamblingConfig(StrictModel):
     forum_channel_id: int
     bot_betting: BotBettingConfig = BotBettingConfig()
+    # Sent to the bot channel with an @everyone when someone swaps their bet, which also jails them.
+    swap_scripts: list[str] = []  # {member}, {old_choice}, {new_choice}, {amount}, {market}
 
 
 class BirthdayConfig(StrictModel):
