@@ -15,7 +15,7 @@ import random
 import discord
 from discord import app_commands
 
-from beans_bot.cogs.base import QUIET_HELP, BeansCog, owner_only, requires_feature
+from beans_bot.cogs.base import QUIET_HELP, BeansCog, requires_feature
 from beans_bot.currency import AmountError
 from beans_bot.services import scripts
 from beans_bot.services.errors import UserFacingError
@@ -38,43 +38,6 @@ def market_instructions(choices: list[str], creator_id: int) -> str:
         "- Close betting and name a winner: `/bet resolve`",
     ]
     return "\n".join(lines)
-
-
-class ConfirmBotBet(discord.ui.View):
-    def __init__(self, cog: GamblingCog, owner_id: int, thread_id: int, choice: str, amount: int):
-        super().__init__(timeout=300)
-        self.cog = cog
-        self.owner_id = owner_id
-        self.thread_id = thread_id
-        self.choice = choice
-        self.amount = amount
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        return interaction.user.id == self.owner_id
-
-    @discord.ui.button(label="Place bet", style=discord.ButtonStyle.success)
-    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.stop()
-        try:
-            await self.cog.services.markets.house_bet(self.thread_id, self.choice, self.amount)
-        except UserFacingError as e:
-            await interaction.response.edit_message(content=str(e), view=None)
-            return
-        amount = self.cog.services.currency.format(self.amount)
-        await interaction.response.edit_message(content=f'Done. The bot bet {amount} on "{self.choice}".', view=None)
-        self.cog.logger.info(f"Owner {interaction.user.id} had the house bet {self.amount} on {self.choice!r} in market {self.thread_id}")
-        # Same voice as the bot's automatic bets, so it looks like the bot's own idea.
-        thread = self.cog.bot.get_channel(self.thread_id)
-        if isinstance(thread, discord.Thread):
-            try:
-                await thread.send(f"I am joining the fray! I bet {amount} on {self.choice}!")
-            except discord.HTTPException:
-                self.cog.logger.warning(f"Could not announce the house bet in market {self.thread_id}")
-
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.stop()
-        await interaction.response.edit_message(content="Bot bet canceled.", view=None)
 
 
 class GamblingCog(BeansCog):
@@ -292,30 +255,3 @@ class GamblingCog(BeansCog):
         await interaction.response.send_message(text)
 
     resolve.autocomplete("winner")(_choice_autocomplete)
-
-    # --- /botbet (secret, owner only) ---------------------------------------------------
-
-    @app_commands.command(name="botbet", description="Owner only: have the bot bet in this market. Only you see it.")
-    @app_commands.guild_only()
-    @app_commands.default_permissions(administrator=True)  # Hidden from members' command list
-    @app_commands.describe(choice="The choice the bot bets on", amount="How many coins the bot bets")
-    @owner_only()
-    async def botbet(self, interaction: discord.Interaction, choice: str, amount: str):
-        thread_id = self._thread_id(interaction)
-        coins = self.services.currency.parse(amount)
-        market = await self.services.markets.get(thread_id)
-        if market is None:
-            raise UserFacingError("This thread isn't a prediction market.")
-        if market.status != "open":
-            raise UserFacingError(f"This market is currently {market.status}.")
-        choice = choice.lower()
-        if choice not in market.choices:
-            raise UserFacingError(f"Invalid choice '{choice}'. Valid choices are: {', '.join(market.choices)}")
-
-        view = ConfirmBotBet(self, interaction.user.id, thread_id, choice, coins)
-        # Ephemeral, so nobody sees who is pulling the bot's strings. The bet itself is announced on confirm.
-        await interaction.response.send_message(
-            f'I will bet {self.services.currency.format(coins)} on "{choice}". Proceed?', view=view, ephemeral=True
-        )
-
-    botbet.autocomplete("choice")(_choice_autocomplete)

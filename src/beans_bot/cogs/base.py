@@ -74,10 +74,12 @@ def in_bot_channel():
     return app_commands.check(predicate)
 
 
-def owner_only():
+def admin_only():
+    """Only allow server admins. Backs up default_permissions, which server owners can override per command."""
+
     async def predicate(interaction: discord.Interaction) -> bool:
-        if not await interaction.client.is_owner(interaction.user):  # type: ignore[attr-defined]
-            raise CheckMessage("Only the bot owner can use this command.")
+        if interaction.guild is None or not interaction.permissions.administrator:
+            raise CheckMessage("Nice try. Only server admins get to pull these levers.")
         return True
 
     return app_commands.check(predicate)

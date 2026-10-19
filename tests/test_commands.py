@@ -28,14 +28,14 @@ async def test_commands_register(tmp_path: Path):
         assert {
             "ping", "admin sync", "admin say", "admin dm", "robrole", "jail bribe", "jail frame", "jail current", "jail info", "jail leaderboard",
             "coins wealth", "coins leaderboard", "bet place", "bet add", "bet swap", "bet stats", "bet close", "bet cancel",
-            "bet resolve", "botbet", "fatcow start", "fatcow consumed", "fatcow went", "fatcow leaderboard",
+            "bet resolve", "admin botbet", "fatcow start", "fatcow consumed", "fatcow went", "fatcow leaderboard",
             "vip daypass", "vip onepercent", "vip status",
         } <= names  # fmt: skip
         for command in bot.tree.get_commands():
             command.to_dict(bot.tree)
-        botbet = bot.tree.get_command("botbet")
-        assert botbet is not None and botbet.guild_only
-        assert botbet.default_permissions is not None and botbet.default_permissions.administrator
+        admin = bot.tree.get_command("admin")
+        assert admin is not None and admin.guild_only
+        assert admin.default_permissions is not None and admin.default_permissions.administrator
     finally:
         for name in list(bot.cogs):
             await bot.remove_cog(name)
