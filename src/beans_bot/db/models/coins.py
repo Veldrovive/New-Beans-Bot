@@ -19,6 +19,8 @@ class CoinAccount(SQLModel, table=True):
 class CoinTransactionKind(StrEnum):
     REACTION = "reaction"  # Minted to a message author when someone reacts with the coin emoji
     BRIBE = "bribe"  # Jailed member -> house
+    FRAME = "frame"  # Member -> house, to jail someone else
+    FRAME_REFUND = "frame_refund"  # House -> member, when the bot couldn't hand out the jail role after all
     BET_PLACE = "bet_place"  # Bettor -> market escrow
     BET_REFUND = "bet_refund"  # Market escrow -> bettor
     BET_PAYOUT = "bet_payout"  # Market escrow -> winner

@@ -7,6 +7,8 @@ Jail: enough jail emoji reactions on a message put its author in the stocks.
 - At the mega jail threshold, the first reply to the bot's prompt becomes
   the member's nickname.
 - Sentences end on a timer, or early with /jail bribe.
+- /jail frame pays the house to jail someone else. Paying the anonymous price
+  keeps the framer's name out of the announcement.
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ from beans_bot.config.schema import JailConfig
 from beans_bot.db.models import CoinTransactionKind
 from beans_bot.services import emoji, scripts
 from beans_bot.services.coins import InsufficientFunds
-from beans_bot.services.jail import JailOutcome, get_member
+from beans_bot.services.jail import AlreadyJailed, JailOutcome, get_member
 
 MAX_NICKNAME_LENGTH = 32
 
@@ -267,6 +269,93 @@ class JailCog(BeansCog):
             interaction.guild, config, interaction.user.id, reason="bribe", audit_reason="Bribed the bot."
         )
         await interaction.response.send_message(scripts.pick(config.bribe.success_scripts, **names) or "You are free.")
+
+    @jail_group.command(name="frame", description="Pay the bot to send someone to jail. Pay extra to keep your name out of it.")
+    @app_commands.describe(member="Who belongs in the stocks", anonymous="Pay the anonymous price so nobody knows it was you")
+    @requires_feature("jail")
+    async def frame(self, interaction: discord.Interaction, member: discord.Member, anonymous: bool = False):
+        assert interaction.guild is not None and interaction.channel_id is not None
+        config = self.jail_config(interaction.guild_id)
+        assert config is not None
+        if config.frame is None:
+            await interaction.response.send_message("The guards here only jail people the honest way: by mob rule.", ephemeral=True)
+            return
+        role = interaction.guild.get_role(config.jailed_role_id)
+        if role is None or not role.is_assignable():
+            self.logger.error(f"Can't assign jail role {config.jailed_role_id} in guild {interaction.guild.id}")
+            await interaction.response.send_message("The cell door is jammed (I can't hand out the jail role). Keep your coins.", ephemeral=True)
+            return
+
+        currency = self.services.currency
+        cost = config.frame.anonymous_cost if anonymous else config.frame.cost
+        try:
+            sentence = await self.services.jail.frame(
+                guild_id=interaction.guild.id,
+                framer_id=interaction.user.id,
+                target_id=member.id,
+                cost=cost,
+                channel_id=interaction.channel_id,
+                length=config.jail_length,
+            )
+        except AlreadyJailed:
+            await interaction.response.send_message(
+                f"{member.mention} is already in jail. You can't frame them twice, however much they deserve it.", ephemeral=True
+            )
+            return
+        except InsufficientFunds as e:
+            await interaction.response.send_message(
+                f"Framing {member.mention}{' anonymously' if anonymous else ''} costs {currency.format(cost)} "
+                f"and you have {currency.format(e.balance)}. Justice isn't cheap.",
+                ephemeral=True,
+            )
+            return
+
+        try:
+            await member.add_roles(role, reason="Framed by a paying member.")
+        except discord.HTTPException:
+            self.logger.warning(f"Could not jail {member.id} for {interaction.user.id}'s frame in guild {interaction.guild.id}")
+            await self.services.jail.refund_frame(
+                guild_id=interaction.guild.id, framer_id=interaction.user.id, target_id=member.id, cost=cost
+            )
+            await interaction.response.send_message(
+                f"The guards wouldn't lay a hand on {member.mention}. Your {currency.format(cost)} has been returned, "
+                f"minus nothing, because I'm honest.",
+                ephemeral=True,
+            )
+            return
+
+        paid = currency.format(cost)
+        release = discord.utils.format_dt(sentence.ends_at, "R")
+        # Framing the bot itself gets its own lines. The coins land in its own pocket, which it notices.
+        framing_me = self.is_own_user(member.id)
+        if not anonymous:
+            values = {"framer": interaction.user.mention, "paid": paid}
+            if framing_me:
+                text = scripts.pick(config.frame.bot_public_scripts, bot_name=member.mention, **values)
+                text = text or f"{values['framer']} paid me {paid} to jail myself. I respect the hustle. To the stocks I go."
+            else:
+                text = scripts.pick(config.frame.public_scripts, jailed_user=member.mention, **values)
+                text = text or f"{values['framer']} makes a very good point that {member.mention} should be in jail."
+            await interaction.response.send_message(f"{text}\n-# {interaction.user.mention} paid {paid}. Released {release}.")
+            return
+
+        # The interaction reply would show who ran the command, so the announcement is a separate message.
+        await interaction.response.send_message(
+            f"Done. {member.mention} is in the stocks and your name stays out of it.\n-# Paid {paid}.", ephemeral=True
+        )
+        if framing_me:
+            text = scripts.pick(config.frame.bot_anonymous_scripts, bot_name=member.mention, paid=paid)
+            text = text or f"Someone paid me {paid} to lock myself up and won't say who. I'll find you. From jail."
+        else:
+            text = scripts.pick(config.frame.anonymous_scripts, jailed_user=member.mention, paid=paid)
+            text = text or f"An anonymous benefactor makes a very good point that {member.mention} should be in jail."
+        channel = interaction.channel
+        if not isinstance(channel, discord.abc.Messageable):
+            return
+        try:
+            await channel.send(f"{text}\n-# Someone paid {paid} to stay anonymous. Released {release}.")
+        except discord.HTTPException:
+            self.logger.warning(f"Could not announce {member.id}'s anonymous frame in guild {interaction.guild.id}")
 
     @jail_group.command(name="current", description="Show who is currently in jail.")
     @app_commands.describe(quiet=QUIET_HELP)

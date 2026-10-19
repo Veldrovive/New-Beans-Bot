@@ -1,8 +1,13 @@
 import datetime
 
-from beans_bot.db.types import utcnow
+import pytest
 
-from conftest import GUILD
+from beans_bot.db.models import CoinTransactionKind
+from beans_bot.db.types import utcnow
+from beans_bot.services.coins import InsufficientFunds
+from beans_bot.services.jail import AlreadyJailed
+
+from conftest import GUILD, HOUSE
 
 
 async def start(jail, user_id, length=datetime.timedelta(hours=1)):
@@ -57,3 +62,52 @@ async def test_pending_rename_claimed_once(jail):
 async def test_tomatoes(jail):
     await jail.record_tomato(guild_id=GUILD, thrower_user_id=1, target_user_id=2, message_id=3, innocent=True)
     assert await jail.tomatoes_received(GUILD, 2) == 1
+
+
+async def fund(coins, user_id, beans):
+    async with coins.db.transaction() as session:
+        await coins.move(session, guild_id=GUILD, amount=beans * 100, kind=CoinTransactionKind.REACTION, to_user_id=user_id)
+
+
+async def frame(jail, framer_id, target_id, cost):
+    return await jail.frame(
+        guild_id=GUILD, framer_id=framer_id, target_id=target_id, cost=cost, channel_id=5, length=datetime.timedelta(hours=1)
+    )
+
+
+async def test_frame_charges_framer_and_jails_target(jail, coins):
+    await fund(coins, 1, 5)
+    sentence = await frame(jail, 1, 2, 300)
+    assert await coins.balance(GUILD, 1) == 200
+    assert await coins.balance(GUILD, HOUSE) == 300
+    assert sentence.user_id == 2 and sentence.offending_message_id is None
+    assert await jail.is_jailed(GUILD, 2)
+    assert not await jail.is_jailed(GUILD, 1)
+
+
+async def test_frame_without_enough_coins_changes_nothing(jail, coins):
+    await fund(coins, 1, 5)
+    with pytest.raises(InsufficientFunds):
+        await frame(jail, 1, 2, 600)
+    assert await coins.balance(GUILD, 1) == 500
+    assert await coins.balance(GUILD, HOUSE) == 0
+    assert not await jail.is_jailed(GUILD, 2)
+
+
+async def test_frame_already_jailed_costs_nothing(jail, coins):
+    await fund(coins, 1, 5)
+    await start(jail, 2)
+    with pytest.raises(AlreadyJailed):
+        await frame(jail, 1, 2, 300)
+    assert await coins.balance(GUILD, 1) == 500
+    assert await coins.balance(GUILD, HOUSE) == 0
+    assert await jail.times_jailed(GUILD, 2) == 1
+
+
+async def test_refund_frame_undoes_it(jail, coins):
+    await fund(coins, 1, 5)
+    await frame(jail, 1, 2, 300)
+    await jail.refund_frame(guild_id=GUILD, framer_id=1, target_id=2, cost=300)
+    assert await coins.balance(GUILD, 1) == 500
+    assert await coins.balance(GUILD, HOUSE) == 0
+    assert not await jail.is_jailed(GUILD, 2)

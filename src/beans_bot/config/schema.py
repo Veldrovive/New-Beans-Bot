@@ -62,6 +62,18 @@ class BribeConfig(StrictModel):
     failure_scripts: list[str] = []  # {bot_name}, {jailed_user}
 
 
+class FrameConfig(StrictModel):
+    """Paying the bot to jail someone else. The anonymous price keeps the framer's name out of the announcement."""
+
+    cost: CoinAmount = parse_amount(3)
+    anonymous_cost: CoinAmount = parse_amount(6)
+    public_scripts: list[str] = []  # {framer}, {jailed_user}, {paid}
+    anonymous_scripts: list[str] = []  # {jailed_user}, {paid}
+    # Used instead of the above when someone frames the bot itself.
+    bot_public_scripts: list[str] = []  # {framer}, {bot_name}, {paid}
+    bot_anonymous_scripts: list[str] = []  # {bot_name}, {paid}
+
+
 class JailConfig(StrictModel):
     jail_emoji: str
     tomato_emoji: str
@@ -82,6 +94,7 @@ class JailConfig(StrictModel):
     forgotten_prisoner_scripts: list[str] = []  # {jailed_user}: had the role but no record, re-jailed
 
     bribe: BribeConfig | None = None
+    frame: FrameConfig | None = None
 
 
 class CoinsConfig(StrictModel):

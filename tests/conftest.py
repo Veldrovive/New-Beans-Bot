@@ -31,8 +31,8 @@ def markets(db, coins):
 
 
 @pytest.fixture
-def jail(db):
-    return JailService(db)
+def jail(db, coins):
+    return JailService(db, coins)
 
 
 @pytest.fixture

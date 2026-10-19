@@ -35,7 +35,7 @@ class Services:
             db=db,
             currency=currency,
             coins=coins,
-            jail=JailService(db),
+            jail=JailService(db, coins),
             markets=MarketService(db, coins),
             vip=VipService(db, coins),
             gemini=GeminiService(config.gemini),

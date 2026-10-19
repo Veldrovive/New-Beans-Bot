@@ -3,6 +3,10 @@ Jail: sentences, the jail role, mega jail renames and tomato records.
 
 Any cog that needs to know whether someone is jailed, or to jail or release
 someone, goes through JailService. It is the only code that touches the jail role.
+
+Members can also frame each other: pay the house to start someone else's sentence.
+The payment and the sentence happen in one transaction, so nobody pays for a
+sentence that never starts (or that someone else already started).
 """
 
 from __future__ import annotations
@@ -16,11 +20,13 @@ import discord
 from sqlalchemy import func, update
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import col, select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from beans_bot.config.schema import JailConfig
 from beans_bot.db.engine import Database
-from beans_bot.db.models import JailSentence, JailUsedMessage, PendingRename, TomatoThrow
+from beans_bot.db.models import CoinTransactionKind, JailSentence, JailUsedMessage, PendingRename, TomatoThrow
 from beans_bot.db.types import utcnow
+from beans_bot.services.coins import CoinService
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +38,10 @@ class JailOutcome(Enum):
     MEMBER_NOT_FOUND = "member_not_found"
     ROLE_NOT_FOUND = "role_not_found"
     MISSING_PERMISSIONS = "missing_permissions"
+
+
+class AlreadyJailed(Exception):
+    """The member is already serving a sentence."""
 
 
 @dataclass
@@ -51,21 +61,39 @@ async def get_member(guild: discord.Guild, user_id: int) -> discord.Member | Non
 
 
 class JailService:
-    def __init__(self, db: Database):
+    def __init__(self, db: Database, coins: CoinService):
         self.db = db
+        self.coins = coins
+
+    # --- Building blocks (run inside a caller's transaction) --------------------------
+
+    async def _current_sentence(self, session: AsyncSession, guild_id: int, user_id: int) -> JailSentence | None:
+        result = await session.exec(
+            select(JailSentence).where(
+                JailSentence.guild_id == guild_id,
+                JailSentence.user_id == user_id,
+                col(JailSentence.released_at).is_(None),
+            )
+        )
+        return result.first()
+
+    async def _end_sentence(self, session: AsyncSession, guild_id: int, user_id: int, reason: str) -> bool:
+        result = await session.exec(
+            update(JailSentence)
+            .where(
+                col(JailSentence.guild_id) == guild_id,
+                col(JailSentence.user_id) == user_id,
+                col(JailSentence.released_at).is_(None),
+            )
+            .values(released_at=utcnow(), release_reason=reason)
+        )
+        return result.rowcount > 0
 
     # --- Records ------------------------------------------------------------------------
 
     async def current_sentence(self, guild_id: int, user_id: int) -> JailSentence | None:
         async with self.db.transaction() as session:
-            result = await session.exec(
-                select(JailSentence).where(
-                    JailSentence.guild_id == guild_id,
-                    JailSentence.user_id == user_id,
-                    col(JailSentence.released_at).is_(None),
-                )
-            )
-            return result.first()
+            return await self._current_sentence(session, guild_id, user_id)
 
     async def is_jailed(self, guild_id: int, user_id: int) -> bool:
         return await self.current_sentence(guild_id, user_id) is not None
@@ -105,14 +133,7 @@ class JailService:
     ) -> JailSentence | None:
         """Record a new sentence, or None if the member is already serving one."""
         async with self.db.transaction() as session:
-            existing = await session.exec(
-                select(JailSentence).where(
-                    JailSentence.guild_id == guild_id,
-                    JailSentence.user_id == user_id,
-                    col(JailSentence.released_at).is_(None),
-                )
-            )
-            if existing.first() is not None:
+            if await self._current_sentence(session, guild_id, user_id) is not None:
                 return None
             now = utcnow()
             sentence = JailSentence(
@@ -129,16 +150,7 @@ class JailService:
     async def end_sentence(self, guild_id: int, user_id: int, reason: str) -> bool:
         """Mark the current sentence released. False if the member wasn't jailed."""
         async with self.db.transaction() as session:
-            result = await session.exec(
-                update(JailSentence)
-                .where(
-                    col(JailSentence.guild_id) == guild_id,
-                    col(JailSentence.user_id) == user_id,
-                    col(JailSentence.released_at).is_(None),
-                )
-                .values(released_at=utcnow(), release_reason=reason)
-            )
-            return result.rowcount > 0
+            return await self._end_sentence(session, guild_id, user_id, reason)
 
     async def mark_humiliated(self, sentence_id: int) -> bool:
         """Mark a sentence humiliated. True only for the call that changed it, so it happens once."""
@@ -171,6 +183,53 @@ class JailService:
                 .limit(limit)
             )
             return [(user_id, times) for user_id, times in result.all()]
+
+    # --- Framing ------------------------------------------------------------------------
+
+    async def frame(
+        self, *, guild_id: int, framer_id: int, target_id: int, cost: int, channel_id: int, length: datetime.timedelta
+    ) -> JailSentence:
+        """
+        Charge the framer and start the target's sentence. The caller hands out the jail role,
+        and calls refund_frame if it can't. Raises AlreadyJailed or InsufficientFunds.
+        """
+        async with self.db.transaction() as session:
+            if await self._current_sentence(session, guild_id, target_id) is not None:
+                raise AlreadyJailed()
+            await self.coins.move(
+                session,
+                guild_id=guild_id,
+                amount=cost,
+                kind=CoinTransactionKind.FRAME,
+                from_user_id=framer_id,
+                to_user_id=self.coins.house_user_id,
+            )
+            now = utcnow()
+            sentence = JailSentence(
+                guild_id=guild_id,
+                user_id=target_id,
+                channel_id=channel_id,
+                offending_message_id=None,
+                started_at=now,
+                ends_at=now + length,
+            )
+            session.add(sentence)
+        logger.info(f"{framer_id} paid {cost} to frame {target_id} in guild {guild_id}")
+        return sentence
+
+    async def refund_frame(self, *, guild_id: int, framer_id: int, target_id: int, cost: int) -> None:
+        """Undo a frame whose jail role never went on: end the sentence and pay the framer back."""
+        async with self.db.transaction() as session:
+            await self._end_sentence(session, guild_id, target_id, "frame_refunded")
+            await self.coins.move(
+                session,
+                guild_id=guild_id,
+                amount=cost,
+                kind=CoinTransactionKind.FRAME_REFUND,
+                from_user_id=self.coins.house_user_id,
+                to_user_id=framer_id,
+            )
+        logger.info(f"Refunded {framer_id} {cost} for framing {target_id} in guild {guild_id}")
 
     # --- Discord side -------------------------------------------------------------------
 

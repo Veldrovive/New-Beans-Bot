@@ -31,11 +31,30 @@ guilds:
       assault_innocent_scripts:
       - HALT {reacting_user}! You have tomatoed the innocent {attacked_user}! I will remember this!
       bribe:
-        cost: 1
+        cost: 3
         success_scripts:
         - The honorable {bot_name} has decided that {jailed_user} is innocent of their crime and must be released immediately!
         failure_scripts:
         - FOR SHAME! {jailed_user} has attempted to bribe your competent and faithful bot! Tomato them!
+      frame:
+        cost: 3
+        anonymous_cost: 6
+        public_scripts:  # {framer}, {jailed_user}, {paid}
+        - "{framer} makes a very good point that {jailed_user} should be in jail."
+        - "{framer} has presented compelling evidence (a sack of coins) that {jailed_user} is guilty. To the stocks!"
+        - "Upon the testimony of {framer}, and their generous donation, {jailed_user} is hereby convicted."
+        - "{framer} slid me {paid} and whispered a name. That name was {jailed_user}. Off you go."
+        anonymous_scripts:  # {jailed_user}, {paid}
+        - "An anonymous benefactor makes a very good point that {jailed_user} should be in jail."
+        - "A hooded figure has paid {paid} to see {jailed_user} in the stocks. I shall not reveal their name. Probably."
+        - "Someone among you wants {jailed_user} in jail badly enough to pay for silence. Look around. Trust no one."
+        bot_public_scripts:  # {framer}, {bot_name}, {paid}
+        - "{framer} has paid me {paid} to throw myself in jail. Tomato me, I suppose."
+        - "{framer} makes a very good point that {bot_name} should be in jail. I am {bot_name}. I hate that it's a good point."
+        - "I, {bot_name}, have been bribed by {framer} to arrest myself. I am both the corrupt guard and the prisoner."
+        bot_anonymous_scripts:  # {bot_name}, {paid}
+        - "Someone has paid me {paid} to jail myself. I took the money. I'm not proud of it."
+        - "An anonymous benefactor makes a very good point that {bot_name} should be in jail. I shall think about this further from my cell."
     coins:
       emoji: BeanCoin
       reaction_value: 1

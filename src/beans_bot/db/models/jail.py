@@ -15,11 +15,11 @@ class JailSentence(SQLModel, table=True):
     guild_id: int
     user_id: int
     channel_id: int
-    offending_message_id: int | None = None  # None when re-jailed by the desync check or jailed for a bet swap
+    offending_message_id: int | None = None  # None when re-jailed by the desync check, framed, or jailed for a bet swap
     started_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
     ends_at: datetime.datetime = Field(sa_type=UTCDateTime)
     released_at: datetime.datetime | None = Field(default=None, sa_type=UTCDateTime, index=True)
-    release_reason: str | None = None  # "served", "bribe", "migrated"
+    release_reason: str | None = None  # "served", "bribe", "frame_refunded", "migrated"
     humiliated: bool = False
 
 
