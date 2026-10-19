@@ -87,11 +87,11 @@ guilds:
       - "{member} has betrayed {old_choice} and run off to {new_choice} with {amount} in {market}. They are in the stocks now. Tomatoes are encouraged."
       - "FLIP-FLOPPER! {member} moved {amount} from {old_choice} to {new_choice} in {market}. Jail is where we keep people with no conviction."
       - "Hear ye! {member} swore by {old_choice}, then crawled over to {new_choice} in {market}. Off to jail with the turncoat."
-      rigged_window: 7200  # Seconds after the market opens that a solo win over the house counts as rigged
-      rigged_scripts:  # {member}, {amount}
-      - "Just you and me, {member}, and you happened to win? Cute. Keep your stake, I'm keeping my {amount}, and you're keeping a cell warm."
-      - "{member} tried to rob the house of {amount} with a rigged one-on-one. Nobody gets paid. The fraudster goes to the stocks."
-      - "The house has reviewed the tape. {member} beat me with no witnesses. Everyone gets their own beans back, and {member} gets jail."
+      rigged_window: 7200  # Seconds after the market opens that winning only the house's money counts as rigged
+      rigged_scripts:  # {members}, {amount}
+      - "The only loser here is me, and it took you no time at all? Cute. {members}: keep your stakes, I'm keeping my {amount}, and you're keeping a cell warm."
+      - "{members} tried to rob the house of {amount} with a rigged market. Nobody gets paid. The fraudsters go to the stocks."
+      - "The house has reviewed the tape. The only money on the table was mine. Everyone gets their own beans back, and {members} get jail."
     birthday:
       birthdays_message_channel_id: 1435678059138121788
       birthdays_message_id: 1491511145511518318

@@ -6,9 +6,9 @@ bets, rounded down to the smallest coin, and the house keeps what's left.
 If nobody (or everybody) picked the winner, every bet is refunded.
 Members can swap their whole bet to another choice while betting is open.
 The cog makes them pay for it with jail and an @everyone.
-- A member who beats the house when nobody else bet, and the market resolves
-  soon after it opened, looks like they rigged it. Everyone gets their own
-  stake back, and the cog sends the member to jail.
+- If the market resolves soon after it opened and the house's bet is the only
+  one that lost, the winners were just taking the bot's money, alone or as a
+  gang. Everyone gets their own stake back, and the cog jails every winner.
 - Members jailed for rigging can't place or add to bets. Nobody in jail can swap.
 """
 
@@ -89,8 +89,8 @@ class Resolution:
     refunded: bool = False  # Nobody, or everybody, picked the winner
     payouts: list[tuple[int, int]] = field(default_factory=list)  # (user_id, amount)
     house_remainder: int = 0
-    rigged_by: int | None = None  # The member who beat the house alone. Refunded, and the cog jails them.
-    denied: int = 0  # The house's stake that rigged_by didn't get
+    rigged_by: list[int] = field(default_factory=list)  # Winners who only beat the house. Refunded, and the cog jails them.
+    denied: int = 0  # The house's stake the riggers didn't get
 
 
 class MarketService:
@@ -234,19 +234,21 @@ class MarketService:
                 resolution.refunded = True
                 return resolution
 
-            # One member against the house, and the member won fast: probably whoever resolved it is in on it.
-            # Nobody wins the house's coins, and the cog jails the member so they don't try again.
+            # The only losing bet is the house's, and it resolved fast: the winners were just taking the
+            # bot's money, and whoever resolved it is probably in on it. Nobody gets the house's coins,
+            # and the cog jails the winners so they don't try again.
             # Markets that ran a while are left alone, since speed is what makes the scam work.
             house = self.coins.house_user_id
-            solo_win = len(bets) == 2 and any(b.user_id == house for b in bets) and winning_bets[0].user_id != house
+            losing_bets = [b for b in bets if b.choice != winning_choice]
+            only_house_lost = all(b.user_id == house for b in losing_bets)
             too_fast = rigged_window is None or market.resolved_at - market.created_at < rigged_window
-            if solo_win and too_fast:
+            if only_house_lost and too_fast:
                 await self._refund_all(session, market, bets)
                 resolution.refunded = True
-                resolution.rigged_by = winning_bets[0].user_id
+                resolution.rigged_by = [b.user_id for b in winning_bets]
                 resolution.denied = pool - winning_total
                 logger.info(
-                    f"{resolution.rigged_by} beat the house alone on market {thread_id} in guild {market.guild_id}; "
+                    f"{resolution.rigged_by} only beat the house on market {thread_id} in guild {market.guild_id}; "
                     f"refunded instead of paying {resolution.denied}"
                 )
                 return resolution

@@ -7,7 +7,7 @@ A Discord bot for the beans server. It's a rewrite of `robot_discord_robot`:
 - **Tomatoes:** throw them at jailed members, or get scolded for hitting an innocent.
 - **BeanCoins:** earned when others react to your messages with the coin emoji. Spend them on bribes and bets.
 - **VIP:** spend BeanCoins on a role that sees the VIP channel: a day pass into the bourgeoisie, or the one permanent "1%" title, which anyone can usurp by paying more than its holder did.
-- **Prediction markets:** betting pools on threads in the gambling forum, with pari-mutuel payouts. `/bet place` and `/bet add` accept `all in` as the amount. `/bet swap` moves your whole bet to another choice, at the cost of an @everyone and a trip to jail. A member who beats the house when nobody else bet, within a couple of hours of the market opening (`rigged_window`), gets a refund instead of the winnings, plus a trip to jail, where they can't bet.
+- **Prediction markets:** betting pools on threads in the gambling forum, with pari-mutuel payouts. `/bet place` and `/bet add` accept `all in` as the amount. `/bet swap` moves your whole bet to another choice, at the cost of an @everyone and a trip to jail. If a market resolves within a couple of hours of opening (`rigged_window`) and the house's bet is the only one that lost, the winners get refunds instead of winnings, plus a trip to jail, where they can't bet.
 - **Birthdays, action holidays, fat cow stats, the robotics student role poll,** and the **image classifier** (cats and moods).
 
 Every command is a slash command, so Discord shows the arguments as you type.

@@ -222,7 +222,7 @@ async def test_beating_the_house_alone_refunds_instead(markets, coins, db, marke
 
     resolution = await markets.resolve(THREAD, CREATOR, "no", rigged_window=datetime.timedelta(hours=2))
     assert resolution.refunded
-    assert (resolution.rigged_by, resolution.denied) == (CREATOR, 500)
+    assert (resolution.rigged_by, resolution.denied) == ([CREATOR], 500)
     assert resolution.payouts == []
     assert await coins.balance(GUILD, CREATOR) == 100
     assert await coins.balance(GUILD, HOUSE) == 0
@@ -234,21 +234,38 @@ async def test_losing_to_the_house_alone_still_pays_the_house(markets, coins, db
     await markets.place_bet(THREAD, 1, "no", 100)
 
     resolution = await markets.resolve(THREAD, CREATOR, "yes")
-    assert resolution.rigged_by is None
+    assert resolution.rigged_by == []
     assert resolution.payouts == [(HOUSE, 600)]
     assert await coins.balance(GUILD, 1) == 0
     assert await coins.balance(GUILD, HOUSE) == 100
 
 
-async def test_beating_the_house_with_company_pays_out(markets, coins, db, market):
+async def test_beating_the_house_as_a_gang_refunds_instead(markets, coins, db, market):
     await markets.house_bet(THREAD, "yes", 400)
     for user in (1, 2):
         await fund(coins, db, user, 100)
         await markets.place_bet(THREAD, user, "no", 100)
 
     resolution = await markets.resolve(THREAD, CREATOR, "no")
-    assert resolution.rigged_by is None
-    assert resolution.payouts == [(1, 300), (2, 300)]
+    assert resolution.refunded
+    assert (resolution.rigged_by, resolution.denied) == ([1, 2], 400)
+    assert await coins.balance(GUILD, 1) == 100
+    assert await coins.balance(GUILD, 2) == 100
+    assert await coins.balance(GUILD, HOUSE) == 0
+
+
+async def test_beating_the_house_and_a_member_pays_out(markets, coins, db, market):
+    await markets.house_bet(THREAD, "yes", 400)
+    await fund(coins, db, 1, 100)
+    await fund(coins, db, 2, 200)
+    await markets.place_bet(THREAD, 1, "no", 100)
+    await markets.place_bet(THREAD, 2, "yes", 200)
+
+    resolution = await markets.resolve(THREAD, CREATOR, "no")
+    assert resolution.rigged_by == []
+    assert resolution.payouts == [(1, 700)]
+    assert await coins.balance(GUILD, 1) == 700
+    assert await coins.balance(GUILD, 2) == 0
     assert await coins.balance(GUILD, HOUSE) == -400
 
 
@@ -262,7 +279,7 @@ async def test_beating_the_house_alone_after_the_window_pays_out(markets, coins,
     await markets.place_bet(THREAD, CREATOR, "no", 100)
 
     resolution = await markets.resolve(THREAD, CREATOR, "no", rigged_window=datetime.timedelta(hours=2))
-    assert resolution.rigged_by is None
+    assert resolution.rigged_by == []
     assert resolution.payouts == [(CREATOR, 600)]
     assert await coins.balance(GUILD, CREATOR) == 600
     assert await coins.balance(GUILD, HOUSE) == -500
