@@ -30,13 +30,14 @@ class Services:
         db = Database(config.db_path)
         currency = CurrencySystem(cheddar_enabled=config.currency.cheddar_enabled)
         coins = CoinService(db, currency)
+        jail = JailService(db, coins)
         return cls(
             config=config,
             db=db,
             currency=currency,
             coins=coins,
-            jail=JailService(db, coins),
-            markets=MarketService(db, coins),
+            jail=jail,
+            markets=MarketService(db, coins, jail),
             vip=VipService(db, coins),
             gemini=GeminiService(config.gemini),
         )

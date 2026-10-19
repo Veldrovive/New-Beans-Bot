@@ -6,10 +6,15 @@ bets, rounded down to the smallest coin, and the house keeps what's left.
 If nobody (or everybody) picked the winner, every bet is refunded.
 Members can swap their whole bet to another choice while betting is open.
 The cog makes them pay for it with jail and an @everyone.
+- Members in jail can't place, add to or swap bets.
+- A member who beats the house when nobody else bet, and the market resolves
+  soon after it opened, looks like they rigged it. Everyone gets their own
+  stake back, and the cog sends the member to jail.
 """
 
 from __future__ import annotations
 
+import datetime
 import logging
 import random
 from dataclasses import dataclass, field
@@ -23,6 +28,7 @@ from beans_bot.db.models import CoinTransactionKind, MarketBet, MarketStatus, Pr
 from beans_bot.db.types import utcnow
 from beans_bot.services.coins import CoinService, InsufficientFunds
 from beans_bot.services.errors import UserFacingError
+from beans_bot.services.jail import JailService
 
 logger = logging.getLogger(__name__)
 
@@ -83,12 +89,15 @@ class Resolution:
     refunded: bool = False  # Nobody, or everybody, picked the winner
     payouts: list[tuple[int, int]] = field(default_factory=list)  # (user_id, amount)
     house_remainder: int = 0
+    rigged_by: int | None = None  # The member who beat the house alone. Refunded, and the cog jails them.
+    denied: int = 0  # The house's stake that rigged_by didn't get
 
 
 class MarketService:
-    def __init__(self, db: Database, coins: CoinService):
+    def __init__(self, db: Database, coins: CoinService, jail: JailService):
         self.db = db
         self.coins = coins
+        self.jail = jail
 
     @property
     def currency(self):
@@ -103,6 +112,10 @@ class MarketService:
     async def _bets(self, session: AsyncSession, thread_id: int) -> list[MarketBet]:
         result = await session.exec(select(MarketBet).where(MarketBet.market_thread_id == thread_id))
         return list(result.all())
+
+    async def _require_free(self, session: AsyncSession, market: PredictionMarket, user_id: int, message: str) -> None:
+        if await self.jail._current_sentence(session, market.guild_id, user_id) is not None:
+            raise UserFacingError(message)
 
     async def _refund_all(self, session: AsyncSession, market: PredictionMarket, bets: list[MarketBet]) -> None:
         for bet in bets:
@@ -187,7 +200,10 @@ class MarketService:
             market.status = MarketStatus.CANCELED
             return len(bets)
 
-    async def resolve(self, thread_id: int, user_id: int, winning_choice: str) -> Resolution:
+    async def resolve(
+        self, thread_id: int, user_id: int, winning_choice: str, *, rigged_window: datetime.timedelta | None = None
+    ) -> Resolution:
+        """Name the winner and pay out. `rigged_window` None means a solo win over the house always counts as rigged."""
         winning_choice = winning_choice.lower()
         async with self.db.transaction() as session:
             market = await self._market(session, thread_id)
@@ -212,6 +228,23 @@ class MarketService:
             if winning_total == 0 or winning_total == pool:
                 await self._refund_all(session, market, bets)
                 resolution.refunded = True
+                return resolution
+
+            # One member against the house, and the member won fast: probably whoever resolved it is in on it.
+            # Nobody wins the house's coins, and the cog jails the member so they don't try again.
+            # Markets that ran a while are left alone, since speed is what makes the scam work.
+            house = self.coins.house_user_id
+            solo_win = len(bets) == 2 and any(b.user_id == house for b in bets) and winning_bets[0].user_id != house
+            too_fast = rigged_window is None or market.resolved_at - market.created_at < rigged_window
+            if solo_win and too_fast:
+                await self._refund_all(session, market, bets)
+                resolution.refunded = True
+                resolution.rigged_by = winning_bets[0].user_id
+                resolution.denied = pool - winning_total
+                logger.info(
+                    f"{resolution.rigged_by} beat the house alone on market {thread_id} in guild {market.guild_id}; "
+                    f"refunded instead of paying {resolution.denied}"
+                )
                 return resolution
 
             for bet in winning_bets:
@@ -252,6 +285,9 @@ class MarketService:
                 raise UserFacingError(f"Invalid option '{choice}'. Valid choices: {', '.join(market.choices)}")
             if await session.get(MarketBet, (thread_id, user_id)) is not None:
                 raise UserFacingError("You have already placed a bet on this prediction!")
+            await self._require_free(
+                session, market, user_id, "Prisoners don't gamble. Serve your time, then lose your money like a free member."
+            )
             amount = await self._stake(session, market, user_id, amount)
             bet = MarketBet(market_thread_id=thread_id, user_id=user_id, choice=choice, amount=amount)
             session.add(bet)
@@ -266,6 +302,9 @@ class MarketService:
             bet = await session.get(MarketBet, (thread_id, user_id))
             if bet is None:
                 raise UserFacingError("You have not placed a bet yet. Place a bet first before adding to it.")
+            await self._require_free(
+                session, market, user_id, "You can't raise from a cell. Your bet stays where it is until you're out."
+            )
             added = await self._stake(session, market, user_id, amount)
             bet.amount += added
             return bet, added
@@ -284,6 +323,10 @@ class MarketService:
                 raise UserFacingError("You can't flip-flop on a bet you never placed. Use `/bet place` first.")
             if bet.choice == choice:
                 raise UserFacingError(f"Your bet is already on **{choice}**. Nothing to swap, coward.")
+            # Swapping from a cell would be free, since the jail is what swapping costs.
+            await self._require_free(
+                session, market, user_id, "You're already in jail. Serve your time before you flip-flop again."
+            )
             swap = Swap(bet=bet, old_choice=bet.choice)
             bet.choice = choice
             logger.info(

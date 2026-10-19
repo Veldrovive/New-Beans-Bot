@@ -117,6 +117,9 @@ class GamblingConfig(StrictModel):
     bot_betting: BotBettingConfig = BotBettingConfig()
     # Sent to the bot channel with an @everyone when someone swaps their bet, which also jails them.
     swap_scripts: list[str] = []  # {member}, {old_choice}, {new_choice}, {amount}, {market}
+    # A member who beats the house with nobody else betting, this soon after the market opened, is refunded and jailed.
+    rigged_window: datetime.timedelta = datetime.timedelta(hours=2)
+    rigged_scripts: list[str] = []  # {member}, {amount}
 
 
 class BirthdayConfig(StrictModel):

@@ -5,6 +5,8 @@ message lists `Choices:`, becomes a betting pool. Members bet BeanCoins with
 - /bet place and /bet add take "all in" as an amount to bet the member's whole balance.
 - /bet swap moves a member's whole bet to another choice, but it pings
   @everyone in the bot channel and sends them to jail.
+- Jailed members can't bet. A member who beats the house with nobody else
+  betting, soon after the market opened, is refunded instead of paid and goes to jail.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ def market_instructions(choices: list[str], creator_id: int) -> str:
         "You may only choose one option.",
         "However, if you want to lose more money you can use `/bet add` to increase your bet.",
         "Changed your mind? `/bet swap` moves your whole bet, but it tells @everyone and sends you to jail.",
+        "No betting from jail. And if it's just you against me and you win right away, I'll assume you cheated.",
         "Check the pool and odds: `/bet stats`",
         "",
         f"Commands for the prediction market manager, <@{creator_id}>:",
@@ -164,10 +167,6 @@ class GamblingCog(BeansCog):
         config = self.guild_config(interaction.guild_id)
         assert config is not None and config.jail is not None and config.gambling is not None
         thread_id = self._thread_id(interaction)
-        # Swapping from a cell would be free, so it isn't allowed.
-        if await self.services.jail.is_jailed(interaction.guild.id, interaction.user.id):
-            raise UserFacingError("You're already in jail. Serve your time before you flip-flop again.")
-
         swap = await self.services.markets.swap_bet(thread_id, interaction.user.id, choice)
         currency = self.services.currency
         await interaction.response.send_message(
@@ -238,8 +237,14 @@ class GamblingCog(BeansCog):
     @bet.command(name="resolve", description="Market creator: name the winning choice and pay out.")
     @app_commands.describe(winner="The choice that won")
     async def resolve(self, interaction: discord.Interaction, winner: str):
-        resolution = await self.services.markets.resolve(self._thread_id(interaction), interaction.user.id, winner)
+        thread_id = self._thread_id(interaction)
+        config = self.guild_config(interaction.guild_id)
+        window = config.gambling.rigged_window if config and config.gambling else None
+        resolution = await self.services.markets.resolve(thread_id, interaction.user.id, winner, rigged_window=window)
         currency = self.services.currency
+        if resolution.rigged_by is not None:
+            await self._punish_rigging(interaction, thread_id, resolution.rigged_by, resolution.denied)
+            return
         if resolution.pool == 0:
             text = "The prediction resolved, but no one bet anything!"
         elif resolution.refunded:
@@ -255,3 +260,27 @@ class GamblingCog(BeansCog):
         await interaction.response.send_message(text)
 
     resolve.autocomplete("winner")(_choice_autocomplete)
+
+    async def _punish_rigging(self, interaction: discord.Interaction, thread_id: int, user_id: int, denied: int):
+        assert interaction.guild is not None
+        config = self.guild_config(interaction.guild_id)
+        assert config is not None and config.gambling is not None
+        values = {"member": f"<@{user_id}>", "amount": self.services.currency.format(denied)}
+        text = scripts.pick(config.gambling.rigged_scripts, **values) or (
+            f"{values['member']} beat the house with nobody else watching. Suspicious. "
+            f"Everyone gets their own stake back, I keep my {values['amount']}, and {values['member']} goes to jail."
+        )
+        await interaction.response.send_message(text)
+
+        if config.jail is None:
+            return
+        result = await self.services.jail.imprison(
+            interaction.guild,
+            config.jail,
+            user_id,
+            channel_id=thread_id,
+            offending_message_id=None,
+            audit_reason="Beat the house in a one-on-one market.",
+        )
+        if result.outcome not in (JailOutcome.JAILED, JailOutcome.ALREADY_JAILED):
+            self.logger.warning(f"Could not jail {user_id} for rigging market {thread_id} in guild {interaction.guild.id}: {result.outcome}")

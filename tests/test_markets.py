@@ -1,7 +1,10 @@
+import datetime
+
 import pytest
 
 from beans_bot.config.schema import BotBettingConfig
-from beans_bot.db.models import CoinTransactionKind
+from beans_bot.db.models import CoinTransactionKind, PredictionMarket
+from beans_bot.db.types import utcnow
 from beans_bot.services.errors import UserFacingError
 from beans_bot.services.markets import InvalidMarket, parse_choices
 
@@ -170,3 +173,80 @@ async def test_auto_bet_amount(markets, coins, db):
     await fund(coins, db, HOUSE, 10_000)
     assert await markets.auto_bet_amount(GUILD, config) == 1000
     assert await markets.auto_bet_amount(GUILD, config.model_copy(update={"enabled": False})) is None
+
+
+async def lock_up(jail, user_id):
+    await jail.start_sentence(
+        guild_id=GUILD, user_id=user_id, channel_id=THREAD, offending_message_id=None, length=datetime.timedelta(hours=1)
+    )
+
+
+async def test_jailed_members_cant_bet(markets, coins, db, jail, market):
+    await fund(coins, db, 1, 300)
+    await markets.place_bet(THREAD, 1, "yes", 100)
+    await fund(coins, db, 2, 100)
+    await lock_up(jail, 1)
+    await lock_up(jail, 2)
+
+    with pytest.raises(UserFacingError, match="Prisoners don't gamble"):
+        await markets.place_bet(THREAD, 2, "yes", 100)
+    with pytest.raises(UserFacingError, match="from a cell"):
+        await markets.add_to_bet(THREAD, 1, 100)
+    with pytest.raises(UserFacingError, match="already in jail"):
+        await markets.swap_bet(THREAD, 1, "no")
+    assert await coins.balance(GUILD, 1) == 200
+    assert await coins.balance(GUILD, 2) == 100
+    assert (await markets.stats(THREAD)).by_choice == {"yes": 100, "no": 0}
+
+
+async def test_beating_the_house_alone_refunds_instead(markets, coins, db, market):
+    await markets.house_bet(THREAD, "yes", 500)
+    await fund(coins, db, CREATOR, 100)
+    await markets.place_bet(THREAD, CREATOR, "no", 100)
+
+    resolution = await markets.resolve(THREAD, CREATOR, "no", rigged_window=datetime.timedelta(hours=2))
+    assert resolution.refunded
+    assert (resolution.rigged_by, resolution.denied) == (CREATOR, 500)
+    assert resolution.payouts == []
+    assert await coins.balance(GUILD, CREATOR) == 100
+    assert await coins.balance(GUILD, HOUSE) == 0
+
+
+async def test_losing_to_the_house_alone_still_pays_the_house(markets, coins, db, market):
+    await markets.house_bet(THREAD, "yes", 500)
+    await fund(coins, db, 1, 100)
+    await markets.place_bet(THREAD, 1, "no", 100)
+
+    resolution = await markets.resolve(THREAD, CREATOR, "yes")
+    assert resolution.rigged_by is None
+    assert resolution.payouts == [(HOUSE, 600)]
+    assert await coins.balance(GUILD, 1) == 0
+    assert await coins.balance(GUILD, HOUSE) == 100
+
+
+async def test_beating_the_house_with_company_pays_out(markets, coins, db, market):
+    await markets.house_bet(THREAD, "yes", 400)
+    for user in (1, 2):
+        await fund(coins, db, user, 100)
+        await markets.place_bet(THREAD, user, "no", 100)
+
+    resolution = await markets.resolve(THREAD, CREATOR, "no")
+    assert resolution.rigged_by is None
+    assert resolution.payouts == [(1, 300), (2, 300)]
+    assert await coins.balance(GUILD, HOUSE) == -400
+
+
+async def test_beating_the_house_alone_after_the_window_pays_out(markets, coins, db, market):
+    async with db.transaction() as session:
+        stored = await session.get(PredictionMarket, THREAD)
+        assert stored is not None
+        stored.created_at = utcnow() - datetime.timedelta(hours=3)
+    await markets.house_bet(THREAD, "yes", 500)
+    await fund(coins, db, CREATOR, 100)
+    await markets.place_bet(THREAD, CREATOR, "no", 100)
+
+    resolution = await markets.resolve(THREAD, CREATOR, "no", rigged_window=datetime.timedelta(hours=2))
+    assert resolution.rigged_by is None
+    assert resolution.payouts == [(CREATOR, 600)]
+    assert await coins.balance(GUILD, CREATOR) == 600
+    assert await coins.balance(GUILD, HOUSE) == -500
