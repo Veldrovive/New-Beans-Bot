@@ -285,5 +285,14 @@ class GamblingCog(BeansCog):
             audit_reason="Beat the house in a one-on-one market.",
             reason=JailReason.RIGGED,
         )
-        if result.outcome not in (JailOutcome.JAILED, JailOutcome.ALREADY_JAILED):
+        if result.outcome is JailOutcome.ALREADY_JAILED:
+            # Already inside for something else: put the rigging on record so it stops their betting.
+            await self.services.jail.resentence(
+                guild_id=interaction.guild.id,
+                user_id=user_id,
+                channel_id=thread_id,
+                length=config.jail.jail_length,
+                reason=JailReason.RIGGED,
+            )
+        elif result.outcome is not JailOutcome.JAILED:
             self.logger.warning(f"Could not jail {user_id} for rigging market {thread_id} in guild {interaction.guild.id}: {result.outcome}")

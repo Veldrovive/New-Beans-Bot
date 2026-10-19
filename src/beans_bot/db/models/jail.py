@@ -28,7 +28,7 @@ class JailSentence(SQLModel, table=True):
     started_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
     ends_at: datetime.datetime = Field(sa_type=UTCDateTime)
     released_at: datetime.datetime | None = Field(default=None, sa_type=UTCDateTime, index=True)
-    release_reason: str | None = None  # "served", "bribe", "frame_refunded", "migrated"
+    release_reason: str | None = None  # "served", "bribe", "frame_refunded", "resentenced", "migrated"
     humiliated: bool = False
     reason: str | None = None  # A JailReason. None for sentences from before reasons were recorded.
 

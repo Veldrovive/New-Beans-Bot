@@ -155,6 +155,33 @@ class JailService:
             session.add(sentence)
             return sentence
 
+    async def resentence(
+        self, *, guild_id: int, user_id: int, channel_id: int, length: datetime.timedelta, reason: JailReason
+    ) -> JailSentence | None:
+        """
+        Swap a prisoner's current sentence for one with a new reason, so the new crime is on record.
+        The clock restarts, but a sentence never gets shorter. None if they aren't in jail.
+        """
+        async with self.db.transaction() as session:
+            current = await self._current_sentence(session, guild_id, user_id)
+            if current is None:
+                return None
+            await self._end_sentence(session, guild_id, user_id, "resentenced")
+            now = utcnow()
+            sentence = JailSentence(
+                guild_id=guild_id,
+                user_id=user_id,
+                channel_id=channel_id,
+                offending_message_id=None,
+                started_at=now,
+                ends_at=max(current.ends_at, now + length),
+                reason=reason,
+                humiliated=current.humiliated,  # They've already been mocked this stay
+            )
+            session.add(sentence)
+        logger.info(f"Resentenced {user_id} in guild {guild_id} for {reason}")
+        return sentence
+
     async def end_sentence(self, guild_id: int, user_id: int, reason: str) -> bool:
         """Mark the current sentence released. False if the member wasn't jailed."""
         async with self.db.transaction() as session:

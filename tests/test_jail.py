@@ -111,3 +111,35 @@ async def test_refund_frame_undoes_it(jail, coins):
     assert await coins.balance(GUILD, 1) == 500
     assert await coins.balance(GUILD, HOUSE) == 0
     assert not await jail.is_jailed(GUILD, 2)
+
+
+async def test_resentence_records_the_new_crime(jail):
+    first = await jail.start_sentence(
+        guild_id=GUILD, user_id=1, channel_id=5, offending_message_id=6, length=datetime.timedelta(hours=1), reason=JailReason.VOTE
+    )
+    assert first is not None
+    await jail.mark_humiliated(first.id)
+
+    sentence = await jail.resentence(guild_id=GUILD, user_id=1, channel_id=5, length=datetime.timedelta(hours=2), reason=JailReason.RIGGED)
+    assert sentence is not None
+    current = await jail.current_sentence(GUILD, 1)
+    assert current is not None
+    assert (current.id, current.reason, current.humiliated) == (sentence.id, JailReason.RIGGED, True)
+    assert current.ends_at > first.ends_at
+    # The vote sentence stays in the history.
+    history = await jail.times_jailed(GUILD, 1)
+    assert history == 2
+
+
+async def test_resentence_never_shortens(jail):
+    first = await jail.start_sentence(
+        guild_id=GUILD, user_id=1, channel_id=5, offending_message_id=None, length=datetime.timedelta(days=3), reason=JailReason.VOTE
+    )
+    assert first is not None
+    sentence = await jail.resentence(guild_id=GUILD, user_id=1, channel_id=5, length=datetime.timedelta(hours=1), reason=JailReason.RIGGED)
+    assert sentence is not None and sentence.ends_at == first.ends_at
+
+
+async def test_resentence_needs_a_prisoner(jail):
+    assert await jail.resentence(guild_id=GUILD, user_id=1, channel_id=5, length=datetime.timedelta(hours=1), reason=JailReason.RIGGED) is None
+    assert await jail.current_sentence(GUILD, 1) is None
