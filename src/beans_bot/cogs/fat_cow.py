@@ -5,7 +5,7 @@ from discord import app_commands
 from sqlalchemy import func
 from sqlmodel import col, select
 
-from beans_bot.cogs.base import BeansCog, requires_feature
+from beans_bot.cogs.base import QUIET_HELP, BeansCog, requires_feature
 from beans_bot.config.schema import FatCowReactions
 from beans_bot.db.models import FatCowConsumption, FatCowVisit
 from beans_bot.services import emoji
@@ -79,8 +79,9 @@ class FatCowCog(BeansCog):
                 self.logger.error(f"Failed to add reaction {e} in guild {interaction.guild_id}: {err}")
 
     @fatcow.command(name="leaderboard", description="Show everyone's fat cow stats.")
+    @app_commands.describe(quiet=QUIET_HELP)
     @requires_feature("fat_cow")
-    async def leaderboard(self, interaction: discord.Interaction):
+    async def leaderboard(self, interaction: discord.Interaction, quiet: bool = False):
         assert interaction.guild is not None
         guild_id = interaction.guild.id
         async with self.services.db.transaction() as session:
@@ -98,7 +99,7 @@ class FatCowCog(BeansCog):
             ).all()
 
         if visits == 0:
-            await interaction.response.send_message("Leaderboard:\nNo fat cow visits recorded yet.")
+            await interaction.response.send_message("Leaderboard:\nNo fat cow visits recorded yet.", ephemeral=quiet)
             return
         lines = ["Total visits to the Palace:", f"{visits}", "", "Leaderboard:"]
         for user_id, meters, times in stats:
@@ -107,4 +108,4 @@ class FatCowCog(BeansCog):
             lines.append(
                 f"{name}: {meters:.2f} meters total, {times} attendances, {meters / times:.2f} meters per tang"
             )
-        await interaction.response.send_message("\n".join(lines))
+        await interaction.response.send_message("\n".join(lines), ephemeral=quiet)

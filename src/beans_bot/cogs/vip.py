@@ -15,7 +15,7 @@ import discord
 from discord import app_commands
 from discord.ext import tasks
 
-from beans_bot.cogs.base import BeansCog, in_bot_channel, requires_feature
+from beans_bot.cogs.base import QUIET_HELP, BeansCog, in_bot_channel, requires_feature
 from beans_bot.config.schema import VipConfig
 from beans_bot.services import scripts
 from beans_bot.services.coins import InsufficientFunds
@@ -200,9 +200,10 @@ class VipCog(BeansCog):
         await interaction.response.send_message(text)
 
     @vip_group.command(name="status", description="Who holds the 1%, what it costs, and how long your day pass lasts.")
+    @app_commands.describe(quiet=QUIET_HELP)
     @requires_feature("vip")
     @in_bot_channel()
-    async def status(self, interaction: discord.Interaction):
+    async def status(self, interaction: discord.Interaction, quiet: bool = False):
         assert interaction.guild_id is not None
         config = self.vip_config(interaction.guild_id)
         assert config is not None
@@ -223,4 +224,4 @@ class VipCog(BeansCog):
             lines.append(f"- None. A day in the bourgeoisie costs {currency.format(config.day_pass.cost)}.")
         else:
             lines.append(f"- Expires {discord.utils.format_dt(day_pass.ends_at, 'R')}")
-        await interaction.response.send_message("\n".join(lines), allowed_mentions=discord.AllowedMentions.none())
+        await interaction.response.send_message("\n".join(lines), allowed_mentions=discord.AllowedMentions.none(), ephemeral=quiet)

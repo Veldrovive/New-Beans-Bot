@@ -5,7 +5,7 @@ import datetime
 import discord
 from discord import app_commands
 
-from beans_bot.cogs.base import BeansCog, in_bot_channel, requires_feature
+from beans_bot.cogs.base import QUIET_HELP, BeansCog, in_bot_channel, requires_feature
 from beans_bot.services import emoji
 from beans_bot.services.coins import ReactionGrantResult
 
@@ -47,10 +47,10 @@ class CoinsCog(BeansCog):
                 pass
 
     @coins_group.command(name="wealth", description="Check your or someone else's BeanCoin wealth.")
-    @app_commands.describe(member="Whose wealth to check (defaults to you)")
+    @app_commands.describe(member="Whose wealth to check (defaults to you)", quiet=QUIET_HELP)
     @requires_feature("coins")
     @in_bot_channel()
-    async def wealth(self, interaction: discord.Interaction, member: discord.Member | None = None):
+    async def wealth(self, interaction: discord.Interaction, member: discord.Member | None = None, quiet: bool = False):
         assert interaction.guild_id is not None
         target = member or interaction.user
         currency = self.services.currency
@@ -61,19 +61,21 @@ class CoinsCog(BeansCog):
             f"- Balance: {currency.format(balance)}\n\n"
             f"**Overall**\n"
             f"- Total Received: {currency.format(received)}\n"
-            f"- Total Gifted to others: {currency.format(gifted)}"
+            f"- Total Gifted to others: {currency.format(gifted)}",
+            ephemeral=quiet,
         )
 
     @coins_group.command(name="leaderboard", description="Show who has the most BeanCoins.")
+    @app_commands.describe(quiet=QUIET_HELP)
     @requires_feature("coins")
     @in_bot_channel()
-    async def leaderboard(self, interaction: discord.Interaction):
+    async def leaderboard(self, interaction: discord.Interaction, quiet: bool = False):
         assert interaction.guild_id is not None
         accounts = await self.services.coins.leaderboard(interaction.guild_id)
         if not accounts:
-            await interaction.response.send_message("No one has any BeanCoins yet!")
+            await interaction.response.send_message("No one has any BeanCoins yet!", ephemeral=quiet)
             return
         lines = ["**BeanCoin Leaderboard**"] + [
             f"{i}. <@{a.user_id}>: {self.services.currency.format(a.balance)}" for i, a in enumerate(accounts, 1)
         ]
-        await interaction.response.send_message("\n".join(lines), allowed_mentions=discord.AllowedMentions.none())
+        await interaction.response.send_message("\n".join(lines), allowed_mentions=discord.AllowedMentions.none(), ephemeral=quiet)

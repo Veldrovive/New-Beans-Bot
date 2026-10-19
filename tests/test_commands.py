@@ -26,7 +26,7 @@ async def test_commands_register(tmp_path: Path):
             await bot.add_cog(cog(bot))
         names = {c.qualified_name for c in bot.tree.walk_commands()}
         assert {
-            "ping", "admin sync", "robrole", "jail bribe", "jail current", "jail info", "jail leaderboard",
+            "ping", "admin sync", "admin say", "admin dm", "robrole", "jail bribe", "jail current", "jail info", "jail leaderboard",
             "coins wealth", "coins leaderboard", "bet place", "bet add", "bet swap", "bet stats", "bet close", "bet cancel",
             "bet resolve", "botbet", "fatcow start", "fatcow consumed", "fatcow went", "fatcow leaderboard",
             "vip daypass", "vip onepercent", "vip status",
@@ -34,9 +34,8 @@ async def test_commands_register(tmp_path: Path):
         for command in bot.tree.get_commands():
             command.to_dict(bot.tree)
         botbet = bot.tree.get_command("botbet")
-        assert botbet is not None and botbet.allowed_contexts is not None
-        assert botbet.allowed_contexts.dm_channel
-        assert not botbet.allowed_contexts.guild
+        assert botbet is not None and botbet.guild_only
+        assert botbet.default_permissions is not None and botbet.default_permissions.administrator
     finally:
         for name in list(bot.cogs):
             await bot.remove_cog(name)

@@ -18,7 +18,7 @@ import discord
 from discord import app_commands
 from discord.ext import tasks
 
-from beans_bot.cogs.base import BeansCog, in_bot_channel, requires_feature
+from beans_bot.cogs.base import QUIET_HELP, BeansCog, in_bot_channel, requires_feature
 from beans_bot.config.schema import JailConfig
 from beans_bot.db.models import CoinTransactionKind
 from beans_bot.services import emoji, scripts
@@ -269,38 +269,41 @@ class JailCog(BeansCog):
         await interaction.response.send_message(scripts.pick(config.bribe.success_scripts, **names) or "You are free.")
 
     @jail_group.command(name="current", description="Show who is currently in jail.")
+    @app_commands.describe(quiet=QUIET_HELP)
     @requires_feature("jail")
     @in_bot_channel()
-    async def current(self, interaction: discord.Interaction):
+    async def current(self, interaction: discord.Interaction, quiet: bool = False):
         sentences = await self.services.jail.current_sentences(interaction.guild_id)
         if not sentences:
-            await interaction.response.send_message("No one is currently in jail!")
+            await interaction.response.send_message("No one is currently in jail!", ephemeral=quiet)
             return
         mentions = ", ".join(f"<@{s.user_id}>" for s in sentences)
         await interaction.response.send_message(
-            f"Currently in jail: {mentions}", allowed_mentions=discord.AllowedMentions.none()
+            f"Currently in jail: {mentions}", allowed_mentions=discord.AllowedMentions.none(), ephemeral=quiet
         )
 
     @jail_group.command(name="info", description="Show someone's jail record.")
-    @app_commands.describe(member="Whose record to show")
+    @app_commands.describe(member="Whose record to show", quiet=QUIET_HELP)
     @requires_feature("jail")
     @in_bot_channel()
-    async def info(self, interaction: discord.Interaction, member: discord.Member):
+    async def info(self, interaction: discord.Interaction, member: discord.Member, quiet: bool = False):
         assert interaction.guild_id is not None
         times = await self.services.jail.times_jailed(interaction.guild_id, member.id)
         tomatoes = await self.services.jail.tomatoes_received(interaction.guild_id, member.id)
         await interaction.response.send_message(
-            f"**Jail Stats for {member.display_name}**\n- Times in jail: {times}\n- Tomatoes thrown at them: {tomatoes}"
+            f"**Jail Stats for {member.display_name}**\n- Times in jail: {times}\n- Tomatoes thrown at them: {tomatoes}",
+            ephemeral=quiet,
         )
 
     @jail_group.command(name="leaderboard", description="Show who has been jailed the most.")
+    @app_commands.describe(quiet=QUIET_HELP)
     @requires_feature("jail")
     @in_bot_channel()
-    async def leaderboard(self, interaction: discord.Interaction):
+    async def leaderboard(self, interaction: discord.Interaction, quiet: bool = False):
         assert interaction.guild_id is not None
         rows = await self.services.jail.leaderboard(interaction.guild_id)
         if not rows:
-            await interaction.response.send_message("No one has been jailed yet!")
+            await interaction.response.send_message("No one has been jailed yet!", ephemeral=quiet)
             return
         lines = ["**Jail Leaderboard**"] + [f"{i}. <@{user_id}>: {count} times" for i, (user_id, count) in enumerate(rows, 1)]
-        await interaction.response.send_message("\n".join(lines), allowed_mentions=discord.AllowedMentions.none())
+        await interaction.response.send_message("\n".join(lines), allowed_mentions=discord.AllowedMentions.none(), ephemeral=quiet)

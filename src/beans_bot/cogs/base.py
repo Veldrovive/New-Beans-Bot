@@ -42,6 +42,10 @@ class CheckMessage(app_commands.CheckFailure):
     """A failed check whose message is shown to the member."""
 
 
+# Lookup commands take `quiet: bool = False` and reply ephemerally when it's set.
+QUIET_HELP = "Only you see the reply"
+
+
 def _interaction_guild_config(interaction: discord.Interaction) -> GuildConfig | None:
     return interaction.client.config.guild(interaction.guild_id)  # type: ignore[attr-defined]
 
