@@ -6,10 +6,10 @@ bets, rounded down to the smallest coin, and the house keeps what's left.
 If nobody (or everybody) picked the winner, every bet is refunded.
 Members can swap their whole bet to another choice while betting is open.
 The cog makes them pay for it with jail and an @everyone.
-- Members in jail can't place, add to or swap bets.
 - A member who beats the house when nobody else bet, and the market resolves
   soon after it opened, looks like they rigged it. Everyone gets their own
   stake back, and the cog sends the member to jail.
+- Members jailed for rigging can't place or add to bets. Nobody in jail can swap.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from beans_bot.config.schema import BotBettingConfig
 from beans_bot.db.engine import Database
-from beans_bot.db.models import CoinTransactionKind, MarketBet, MarketStatus, PredictionMarket
+from beans_bot.db.models import CoinTransactionKind, JailReason, MarketBet, MarketStatus, PredictionMarket
 from beans_bot.db.types import utcnow
 from beans_bot.services.coins import CoinService, InsufficientFunds
 from beans_bot.services.errors import UserFacingError
@@ -113,8 +113,12 @@ class MarketService:
         result = await session.exec(select(MarketBet).where(MarketBet.market_thread_id == thread_id))
         return list(result.all())
 
-    async def _require_free(self, session: AsyncSession, market: PredictionMarket, user_id: int, message: str) -> None:
-        if await self.jail._current_sentence(session, market.guild_id, user_id) is not None:
+    async def _require_free(
+        self, session: AsyncSession, market: PredictionMarket, user_id: int, message: str, *, any_reason: bool = False
+    ) -> None:
+        """Refuse members jailed for rigging a market, or jailed at all with `any_reason`."""
+        sentence = await self.jail._current_sentence(session, market.guild_id, user_id)
+        if sentence is not None and (any_reason or sentence.reason == JailReason.RIGGED):
             raise UserFacingError(message)
 
     async def _refund_all(self, session: AsyncSession, market: PredictionMarket, bets: list[MarketBet]) -> None:
@@ -286,7 +290,7 @@ class MarketService:
             if await session.get(MarketBet, (thread_id, user_id)) is not None:
                 raise UserFacingError("You have already placed a bet on this prediction!")
             await self._require_free(
-                session, market, user_id, "Prisoners don't gamble. Serve your time, then lose your money like a free member."
+                session, market, user_id, "Fraudsters don't gamble. You rigged the last one, so serve your time, then lose your money like an honest member."
             )
             amount = await self._stake(session, market, user_id, amount)
             bet = MarketBet(market_thread_id=thread_id, user_id=user_id, choice=choice, amount=amount)
@@ -303,7 +307,7 @@ class MarketService:
             if bet is None:
                 raise UserFacingError("You have not placed a bet yet. Place a bet first before adding to it.")
             await self._require_free(
-                session, market, user_id, "You can't raise from a cell. Your bet stays where it is until you're out."
+                session, market, user_id, "You can't raise from a cell, cheater. Your bet stays where it is until you're out."
             )
             added = await self._stake(session, market, user_id, amount)
             bet.amount += added
@@ -325,7 +329,7 @@ class MarketService:
                 raise UserFacingError(f"Your bet is already on **{choice}**. Nothing to swap, coward.")
             # Swapping from a cell would be free, since the jail is what swapping costs.
             await self._require_free(
-                session, market, user_id, "You're already in jail. Serve your time before you flip-flop again."
+                session, market, user_id, "You're already in jail. Serve your time before you flip-flop again.", any_reason=True
             )
             swap = Swap(bet=bet, old_choice=bet.choice)
             bet.choice = choice

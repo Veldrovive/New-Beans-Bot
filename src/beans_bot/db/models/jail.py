@@ -1,8 +1,17 @@
 import datetime
+from enum import StrEnum
 
 from sqlmodel import Field, Index, SQLModel, UniqueConstraint
 
 from beans_bot.db.types import UTCDateTime, utcnow
+
+
+class JailReason(StrEnum):
+    VOTE = "vote"  # Tomatoed by popular vote
+    FRAME = "frame"
+    SWAP = "swap"  # Swapped a bet
+    RIGGED = "rigged"  # Beat the house alone in a market. Can't bet until released.
+    DESYNC = "desync"  # Had the jail role but no record
 
 
 class JailSentence(SQLModel, table=True):
@@ -21,6 +30,7 @@ class JailSentence(SQLModel, table=True):
     released_at: datetime.datetime | None = Field(default=None, sa_type=UTCDateTime, index=True)
     release_reason: str | None = None  # "served", "bribe", "frame_refunded", "migrated"
     humiliated: bool = False
+    reason: str | None = None  # A JailReason. None for sentences from before reasons were recorded.
 
 
 class JailUsedMessage(SQLModel, table=True):

@@ -5,8 +5,8 @@ message lists `Choices:`, becomes a betting pool. Members bet BeanCoins with
 - /bet place and /bet add take "all in" as an amount to bet the member's whole balance.
 - /bet swap moves a member's whole bet to another choice, but it pings
   @everyone in the bot channel and sends them to jail.
-- Jailed members can't bet. A member who beats the house with nobody else
-  betting, soon after the market opened, is refunded instead of paid and goes to jail.
+- A member who beats the house with nobody else betting, soon after the market
+  opened, is refunded instead of paid, and goes to jail where they can't bet.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ from discord import app_commands
 
 from beans_bot.cogs.base import QUIET_HELP, BeansCog, requires_feature
 from beans_bot.currency import AmountError
+from beans_bot.db.models import JailReason
 from beans_bot.services import scripts
 from beans_bot.services.errors import UserFacingError
 from beans_bot.services.jail import JailOutcome
@@ -32,7 +33,7 @@ def market_instructions(choices: list[str], creator_id: int) -> str:
         "You may only choose one option.",
         "However, if you want to lose more money you can use `/bet add` to increase your bet.",
         "Changed your mind? `/bet swap` moves your whole bet, but it tells @everyone and sends you to jail.",
-        "No betting from jail. And if it's just you against me and you win right away, I'll assume you cheated.",
+        "If it's just you against me and you win right away, I'll assume you cheated, and cheaters don't bet from jail.",
         "Check the pool and odds: `/bet stats`",
         "",
         f"Commands for the prediction market manager, <@{creator_id}>:",
@@ -181,6 +182,7 @@ class GamblingCog(BeansCog):
             channel_id=thread_id,
             offending_message_id=None,
             audit_reason="Swapped their bet.",
+            reason=JailReason.SWAP,
         )
         if result.outcome is not JailOutcome.JAILED:
             self.logger.warning(f"Could not jail {interaction.user.id} for swapping in guild {interaction.guild.id}: {result.outcome}")
@@ -281,6 +283,7 @@ class GamblingCog(BeansCog):
             channel_id=thread_id,
             offending_message_id=None,
             audit_reason="Beat the house in a one-on-one market.",
+            reason=JailReason.RIGGED,
         )
         if result.outcome not in (JailOutcome.JAILED, JailOutcome.ALREADY_JAILED):
             self.logger.warning(f"Could not jail {user_id} for rigging market {thread_id} in guild {interaction.guild.id}: {result.outcome}")

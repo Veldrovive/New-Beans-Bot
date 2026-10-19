@@ -22,7 +22,7 @@ from discord.ext import tasks
 
 from beans_bot.cogs.base import QUIET_HELP, BeansCog, in_bot_channel, requires_feature
 from beans_bot.config.schema import JailConfig
-from beans_bot.db.models import CoinTransactionKind
+from beans_bot.db.models import CoinTransactionKind, JailReason
 from beans_bot.services import emoji, scripts
 from beans_bot.services.coins import InsufficientFunds
 from beans_bot.services.jail import AlreadyJailed, JailOutcome, get_member
@@ -230,6 +230,7 @@ class JailCog(BeansCog):
                         channel_id=channel.id,  # type: ignore[attr-defined]
                         offending_message_id=None,
                         length=config.jail_length,
+                        reason=JailReason.DESYNC,
                     )
                     if sentence is not None:
                         if text := scripts.pick(config.forgotten_prisoner_scripts, jailed_user=member.mention):

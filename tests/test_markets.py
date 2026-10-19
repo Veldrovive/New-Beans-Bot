@@ -3,7 +3,7 @@ import datetime
 import pytest
 
 from beans_bot.config.schema import BotBettingConfig
-from beans_bot.db.models import CoinTransactionKind, PredictionMarket
+from beans_bot.db.models import CoinTransactionKind, JailReason, PredictionMarket
 from beans_bot.db.types import utcnow
 from beans_bot.services.errors import UserFacingError
 from beans_bot.services.markets import InvalidMarket, parse_choices
@@ -175,20 +175,25 @@ async def test_auto_bet_amount(markets, coins, db):
     assert await markets.auto_bet_amount(GUILD, config.model_copy(update={"enabled": False})) is None
 
 
-async def lock_up(jail, user_id):
+async def lock_up(jail, user_id, reason):
     await jail.start_sentence(
-        guild_id=GUILD, user_id=user_id, channel_id=THREAD, offending_message_id=None, length=datetime.timedelta(hours=1)
+        guild_id=GUILD,
+        user_id=user_id,
+        channel_id=THREAD,
+        offending_message_id=None,
+        length=datetime.timedelta(hours=1),
+        reason=reason,
     )
 
 
-async def test_jailed_members_cant_bet(markets, coins, db, jail, market):
+async def test_riggers_cant_bet_from_jail(markets, coins, db, jail, market):
     await fund(coins, db, 1, 300)
     await markets.place_bet(THREAD, 1, "yes", 100)
     await fund(coins, db, 2, 100)
-    await lock_up(jail, 1)
-    await lock_up(jail, 2)
+    await lock_up(jail, 1, JailReason.RIGGED)
+    await lock_up(jail, 2, JailReason.RIGGED)
 
-    with pytest.raises(UserFacingError, match="Prisoners don't gamble"):
+    with pytest.raises(UserFacingError, match="Fraudsters don't gamble"):
         await markets.place_bet(THREAD, 2, "yes", 100)
     with pytest.raises(UserFacingError, match="from a cell"):
         await markets.add_to_bet(THREAD, 1, 100)
@@ -197,6 +202,17 @@ async def test_jailed_members_cant_bet(markets, coins, db, jail, market):
     assert await coins.balance(GUILD, 1) == 200
     assert await coins.balance(GUILD, 2) == 100
     assert (await markets.stats(THREAD)).by_choice == {"yes": 100, "no": 0}
+
+
+async def test_other_prisoners_can_bet_but_not_swap(markets, coins, db, jail, market):
+    await fund(coins, db, 1, 300)
+    await lock_up(jail, 1, JailReason.VOTE)
+    await markets.place_bet(THREAD, 1, "yes", 100)
+    bet, _ = await markets.add_to_bet(THREAD, 1, 100)
+    assert bet.amount == 200
+    with pytest.raises(UserFacingError, match="already in jail"):
+        await markets.swap_bet(THREAD, 1, "no")
+    assert await coins.balance(GUILD, 1) == 100
 
 
 async def test_beating_the_house_alone_refunds_instead(markets, coins, db, market):

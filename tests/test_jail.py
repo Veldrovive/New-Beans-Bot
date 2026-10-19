@@ -2,7 +2,7 @@ import datetime
 
 import pytest
 
-from beans_bot.db.models import CoinTransactionKind
+from beans_bot.db.models import CoinTransactionKind, JailReason
 from beans_bot.db.types import utcnow
 from beans_bot.services.coins import InsufficientFunds
 from beans_bot.services.jail import AlreadyJailed
@@ -11,7 +11,7 @@ from conftest import GUILD, HOUSE
 
 
 async def start(jail, user_id, length=datetime.timedelta(hours=1)):
-    return await jail.start_sentence(guild_id=GUILD, user_id=user_id, channel_id=5, offending_message_id=6, length=length)
+    return await jail.start_sentence(guild_id=GUILD, user_id=user_id, channel_id=5, offending_message_id=6, length=length, reason=JailReason.VOTE)
 
 
 async def test_one_sentence_at_a_time(jail):

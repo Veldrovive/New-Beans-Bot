@@ -24,7 +24,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from beans_bot.config.schema import JailConfig
 from beans_bot.db.engine import Database
-from beans_bot.db.models import CoinTransactionKind, JailSentence, JailUsedMessage, PendingRename, TomatoThrow
+from beans_bot.db.models import CoinTransactionKind, JailReason, JailSentence, JailUsedMessage, PendingRename, TomatoThrow
 from beans_bot.db.types import utcnow
 from beans_bot.services.coins import CoinService
 
@@ -129,7 +129,14 @@ class JailService:
                 await session.delete(used)
 
     async def start_sentence(
-        self, *, guild_id: int, user_id: int, channel_id: int, offending_message_id: int | None, length: datetime.timedelta
+        self,
+        *,
+        guild_id: int,
+        user_id: int,
+        channel_id: int,
+        offending_message_id: int | None,
+        length: datetime.timedelta,
+        reason: JailReason,
     ) -> JailSentence | None:
         """Record a new sentence, or None if the member is already serving one."""
         async with self.db.transaction() as session:
@@ -143,6 +150,7 @@ class JailService:
                 offending_message_id=offending_message_id,
                 started_at=now,
                 ends_at=now + length,
+                reason=reason,
             )
             session.add(sentence)
             return sentence
@@ -212,6 +220,7 @@ class JailService:
                 offending_message_id=None,
                 started_at=now,
                 ends_at=now + length,
+                reason=JailReason.FRAME,
             )
             session.add(sentence)
         logger.info(f"{framer_id} paid {cost} to frame {target_id} in guild {guild_id}")
@@ -250,6 +259,7 @@ class JailService:
             channel_id=offending_message.channel.id,
             offending_message_id=offending_message.id,
             audit_reason="Sent to the stocks by popular vote.",
+            reason=JailReason.VOTE,
         )
         if result.outcome in (JailOutcome.MEMBER_NOT_FOUND, JailOutcome.ROLE_NOT_FOUND, JailOutcome.MISSING_PERMISSIONS):
             # Nobody went to jail, so the message can still jail them later.
@@ -265,6 +275,7 @@ class JailService:
         channel_id: int,
         offending_message_id: int | None,
         audit_reason: str,
+        reason: JailReason,
     ) -> JailResult:
         """Give a member the jail role and start a sentence, for any reason (a voted message, a swapped bet)."""
         member = await get_member(guild, user_id)
@@ -290,6 +301,7 @@ class JailService:
             channel_id=channel_id,
             offending_message_id=offending_message_id,
             length=config.jail_length,
+            reason=reason,
         )
         logger.info(f"Jailed {user_id} in guild {guild.id} ({audit_reason})")
         return JailResult(JailOutcome.JAILED, member)
