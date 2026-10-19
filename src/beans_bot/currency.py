@@ -33,6 +33,9 @@ CHEDDARCOIN = Currency("CheddarCoin", "CheddarCoins", BASE_UNITS_PER_BEAN // 10,
 
 ALL_CURRENCIES = (BEANCOIN, CHEDDARCOIN)
 
+# Words that mean "my whole balance" in commands that accept it (see CurrencySystem.parse_bet).
+ALL_IN_WORDS = frozenset({"all", "all in", "allin", "everything", "max"})
+
 _AMOUNT_RE = re.compile(r"^\s*(?P<number>[+-]?\d+(?:\.\d+)?|[+-]?\.\d+)\s*(?P<unit>[a-z]+)?\s*$", re.IGNORECASE)
 
 
@@ -72,6 +75,15 @@ class CurrencySystem:
         if amount % self.granularity != 0:
             raise AmountError(f"The smallest amount you can use is 1 {self.smallest.name}.")
         return amount
+
+    def parse_bet(self, text: str) -> int | None:
+        """
+        Like parse, but "all in" (or "all", "everything", ...) returns None, meaning
+        the member's whole balance. The caller resolves None inside its transaction.
+        """
+        if text.strip().lower() in ALL_IN_WORDS:
+            return None
+        return self.parse(text)
 
     def format(self, amount: int) -> str:
         """Format base units as text, e.g. "12 BeanCoins" or "1 BeanCoin 5 CheddarCoins"."""

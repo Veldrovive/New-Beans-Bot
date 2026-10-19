@@ -115,7 +115,13 @@ class MarketService:
                 thread_id=market.thread_id,
             )
 
-    async def _stake(self, session: AsyncSession, market: PredictionMarket, user_id: int, amount: int) -> None:
+    async def _stake(self, session: AsyncSession, market: PredictionMarket, user_id: int, amount: int | None) -> int:
+        """Move a member's stake to the market. None means all in. Returns the amount staked."""
+        if amount is None:
+            # Read the balance in this transaction so nothing can change it before the move.
+            amount = self.currency.floor(await self.coins.balance_in(session, market.guild_id, user_id))
+            if amount <= 0:
+                raise UserFacingError("You went all in with nothing. Bold. Also broke. You have 0 BeanCoins to bet.")
         try:
             await self.coins.move(
                 session,
@@ -129,6 +135,7 @@ class MarketService:
             raise UserFacingError(
                 f"You don't have enough BeanCoins! You only have {self.currency.format(e.balance)}."
             ) from e
+        return amount
 
     # --- Queries ------------------------------------------------------------------------
 
@@ -234,7 +241,8 @@ class MarketService:
 
     # --- Betting ------------------------------------------------------------------------
 
-    async def place_bet(self, thread_id: int, user_id: int, choice: str, amount: int) -> MarketBet:
+    async def place_bet(self, thread_id: int, user_id: int, choice: str, amount: int | None) -> MarketBet:
+        """Place a bet. An amount of None goes all in."""
         choice = choice.lower()
         async with self.db.transaction() as session:
             market = await self._market(session, thread_id)
@@ -244,12 +252,13 @@ class MarketService:
                 raise UserFacingError(f"Invalid option '{choice}'. Valid choices: {', '.join(market.choices)}")
             if await session.get(MarketBet, (thread_id, user_id)) is not None:
                 raise UserFacingError("You have already placed a bet on this prediction!")
-            await self._stake(session, market, user_id, amount)
+            amount = await self._stake(session, market, user_id, amount)
             bet = MarketBet(market_thread_id=thread_id, user_id=user_id, choice=choice, amount=amount)
             session.add(bet)
             return bet
 
-    async def add_to_bet(self, thread_id: int, user_id: int, amount: int) -> MarketBet:
+    async def add_to_bet(self, thread_id: int, user_id: int, amount: int | None) -> tuple[MarketBet, int]:
+        """Add to a bet. An amount of None goes all in. Returns the bet and the amount added."""
         async with self.db.transaction() as session:
             market = await self._market(session, thread_id)
             if market.status != MarketStatus.OPEN:
@@ -257,9 +266,9 @@ class MarketService:
             bet = await session.get(MarketBet, (thread_id, user_id))
             if bet is None:
                 raise UserFacingError("You have not placed a bet yet. Place a bet first before adding to it.")
-            await self._stake(session, market, user_id, amount)
-            bet.amount += amount
-            return bet
+            added = await self._stake(session, market, user_id, amount)
+            bet.amount += added
+            return bet, added
 
     async def swap_bet(self, thread_id: int, user_id: int, choice: str) -> Swap:
         """Move a member's whole bet to another choice. No coins move: the stake stays in the pool."""

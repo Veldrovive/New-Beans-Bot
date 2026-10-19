@@ -2,6 +2,7 @@
 Prediction markets. A new thread in the guild's gambling forum, whose first
 message lists `Choices:`, becomes a betting pool. Members bet BeanCoins with
 /bet, and the thread's creator closes, cancels or resolves it.
+- /bet place and /bet add take "all in" as an amount to bet the member's whole balance.
 - /bet swap moves a member's whole bet to another choice, but it pings
   @everyone in the bot channel and sends them to jail.
 """
@@ -15,6 +16,7 @@ import discord
 from discord import app_commands
 
 from beans_bot.cogs.base import QUIET_HELP, BeansCog, owner_only, requires_feature
+from beans_bot.currency import AmountError
 from beans_bot.services import scripts
 from beans_bot.services.errors import UserFacingError
 from beans_bot.services.jail import JailOutcome
@@ -141,32 +143,53 @@ class GamblingCog(BeansCog):
             return []
         return [app_commands.Choice(name=c, value=c) for c in market.choices if current.lower() in c][:25]
 
+    async def _amount_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+        # Suggestions only: members can still submit whatever they typed.
+        currency = self.services.currency
+        options = []
+        if current.strip():
+            try:
+                parsed = currency.parse_bet(current)
+                label = "All in" if parsed is None else currency.format(parsed)
+            except AmountError as e:
+                label = str(e)
+            options.append(app_commands.Choice(name=label[:100], value=current[:100]))
+        if interaction.guild_id is not None:
+            balance = await self.services.coins.balance(interaction.guild_id, interaction.user.id)
+            options.append(app_commands.Choice(name=f"All in ({currency.format(currency.floor(max(balance, 0)))})", value="all in"))
+        return options
+
     def _thread_id(self, interaction: discord.Interaction) -> int:
         if interaction.channel_id is None or not isinstance(interaction.channel, discord.Thread):
             raise UserFacingError("Use this in a prediction market thread.")
         return interaction.channel_id
 
     @bet.command(name="place", description="Bet on one of this market's choices.")
-    @app_commands.describe(choice="What you think will happen", amount="How many coins to bet, like 10 or 2.5")
+    @app_commands.describe(choice="What you think will happen", amount="How many coins to bet, like 10, 2.5 or all in")
     async def place(self, interaction: discord.Interaction, choice: str, amount: str):
-        coins = self.services.currency.parse(amount)
+        coins = self.services.currency.parse_bet(amount)
         bet = await self.services.markets.place_bet(self._thread_id(interaction), interaction.user.id, choice, coins)
+        flourish = " ALL IN! Every last bean." if coins is None else ""
         await interaction.response.send_message(
-            f"{interaction.user.mention} bet {self.services.currency.format(bet.amount)} on **{bet.choice}**!"
+            f"{interaction.user.mention} bet {self.services.currency.format(bet.amount)} on **{bet.choice}**!{flourish}"
         )
 
     place.autocomplete("choice")(_choice_autocomplete)
+    place.autocomplete("amount")(_amount_autocomplete)
 
     @bet.command(name="add", description="Add more coins to your bet.")
-    @app_commands.describe(amount="How many coins to add")
+    @app_commands.describe(amount="How many coins to add, like 10, 2.5 or all in")
     async def add(self, interaction: discord.Interaction, amount: str):
-        coins = self.services.currency.parse(amount)
-        bet = await self.services.markets.add_to_bet(self._thread_id(interaction), interaction.user.id, coins)
+        coins = self.services.currency.parse_bet(amount)
+        bet, added = await self.services.markets.add_to_bet(self._thread_id(interaction), interaction.user.id, coins)
         currency = self.services.currency
+        flourish = " ALL IN! Every last bean." if coins is None else ""
         await interaction.response.send_message(
-            f"{interaction.user.mention} added {currency.format(coins)} to their bet on **{bet.choice}**! "
+            f"{interaction.user.mention} added {currency.format(added)} to their bet on **{bet.choice}**!{flourish} "
             f"New total: {currency.format(bet.amount)}."
         )
+
+    add.autocomplete("amount")(_amount_autocomplete)
 
     @bet.command(
         name="swap", description="Move your whole bet to another choice. Pings @everyone and sends you to jail."

@@ -74,9 +74,29 @@ async def test_betting_rules(markets, coins, db, market):
     await markets.place_bet(THREAD, 1, "yes", 100)
     with pytest.raises(UserFacingError, match="already placed"):
         await markets.place_bet(THREAD, 1, "no", 100)
-    bet = await markets.add_to_bet(THREAD, 1, 100)
-    assert bet.amount == 200
+    bet, added = await markets.add_to_bet(THREAD, 1, 100)
+    assert (bet.amount, added) == (200, 100)
     assert await coins.balance(GUILD, 1) == 100
+
+
+async def test_all_in(markets, coins, db, market):
+    await fund(coins, db, 1, 300)
+    bet = await markets.place_bet(THREAD, 1, "yes", None)
+    assert bet.amount == 300
+    assert await coins.balance(GUILD, 1) == 0
+
+    await fund(coins, db, 1, 200)
+    bet, added = await markets.add_to_bet(THREAD, 1, None)
+    assert (bet.amount, added) == (500, 200)
+    assert await coins.balance(GUILD, 1) == 0
+    assert (await markets.stats(THREAD)).pool == 500
+
+
+async def test_all_in_with_nothing_changes_nothing(markets, coins, market):
+    with pytest.raises(UserFacingError, match="all in with nothing"):
+        await markets.place_bet(THREAD, 1, "yes", None)
+    assert await coins.balance(GUILD, 1) == 0
+    assert (await markets.stats(THREAD)).pool == 0
 
 
 async def test_swap_moves_whole_bet(markets, coins, db, market):

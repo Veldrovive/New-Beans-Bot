@@ -26,6 +26,19 @@ def test_invalid_amounts(text):
         CurrencySystem(cheddar_enabled=True).parse(text)
 
 
+@pytest.mark.parametrize("text", ["all", "All In", " allin ", "everything", "MAX"])
+def test_parse_bet_all_in(text):
+    assert CurrencySystem().parse_bet(text) is None
+
+
+def test_parse_bet_amounts():
+    assert CurrencySystem().parse_bet("5") == 500
+    with pytest.raises(AmountError):
+        CurrencySystem().parse_bet("all of it")
+    with pytest.raises(AmountError):
+        CurrencySystem().parse("all")
+
+
 def test_format():
     assert CurrencySystem().format(1200) == "12 BeanCoins"
     assert CurrencySystem().format(100) == "1 BeanCoin"
