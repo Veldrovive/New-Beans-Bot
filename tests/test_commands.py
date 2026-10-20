@@ -12,11 +12,12 @@ from beans_bot.cogs.fat_cow import FatCowCog
 from beans_bot.cogs.gambling import GamblingCog
 from beans_bot.cogs.jail import JailCog
 from beans_bot.cogs.role_name import RoleNameCog
+from beans_bot.cogs.snipes import SnipesCog
 from beans_bot.cogs.tomatoes import TomatoesCog
 from beans_bot.cogs.vip import VipCog
 from beans_bot.config.schema import BotConfig
 
-COGS = (BasicCog, AdminCog, RoleNameCog, JailCog, TomatoesCog, CoinsCog, GamblingCog, FatCowCog, BirthdayCog, ActionHolidayCog, VipCog)
+COGS = (BasicCog, AdminCog, RoleNameCog, JailCog, TomatoesCog, CoinsCog, GamblingCog, FatCowCog, BirthdayCog, ActionHolidayCog, VipCog, SnipesCog)
 
 
 async def test_commands_register(tmp_path: Path):

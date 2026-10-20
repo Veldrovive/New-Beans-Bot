@@ -7,6 +7,7 @@ from beans_bot.db.models.fat_cow import FatCowConsumption, FatCowVisit
 from beans_bot.db.models.jail import JailReason, JailSentence, JailUsedMessage, PendingRename, TomatoThrow
 from beans_bot.db.models.markets import MarketBet, MarketStatus, PredictionMarket
 from beans_bot.db.models.role_name import RoleNamePoll
+from beans_bot.db.models.snipes import Snipe, SnipeVote
 from beans_bot.db.models.vip import OnePercentTitle, VipDayPass
 
 __all__ = [
@@ -28,6 +29,8 @@ __all__ = [
     "PendingRename",
     "PredictionMarket",
     "RoleNamePoll",
+    "Snipe",
+    "SnipeVote",
     "TomatoThrow",
     "UsedHoliday",
     "UsedOnThisDay",
