@@ -1,11 +1,12 @@
 """
-Snipes: photos of members posted in the snipe channel, verified by the Council of Teds.
+Snipes: photos of members posted in the snipe channel, judged by the Council of Teds.
 
 - Tag exactly one member with the photo and the snipe starts. Tag nobody, or several, and the
   bot replies with a picker that only the poster can use, then deletes it once they answer.
 - The bot marks the photo pending and pings the council. When more than half the council has
-  reacted with their crests, the ping is deleted and replaced with who verified it.
-- Fake snipes get jail reactions, which the jail cog already handles.
+  reacted with their crests, the ping is deleted and replaced with who verified it. When more than
+  half has reacted with the nay emoji instead, it's replaced with who rejected it.
+- If the council hasn't decided within the vote timeout, the snipe expires and the ping goes too.
 - Only a crest's owner may react with it. Anyone else's crest reaction is removed, anywhere in the server.
 - Pending snipes are recounted from the photo's reactions every few minutes, in case the bot missed some.
 """
@@ -19,6 +20,7 @@ from discord.ext import tasks
 
 from beans_bot.cogs.base import BeansCog
 from beans_bot.config.schema import SnipesConfig
+from beans_bot.db.models import Snipe
 from beans_bot.db.types import utcnow
 from beans_bot.services import emoji, scripts
 from beans_bot.services.snipes import AlreadySniped
@@ -191,10 +193,12 @@ class SnipesCog(BeansCog):
         text = scripts.pick(config.alert_scripts, **names)
         text = text or f"{names['council']}: {names['sniper']} claims to have sniped {names['target']}. Judge them."
         crests = " ".join(str(e) for m in council for e in emoji.resolve(guild, m.crest_emoji))
-        guild_config = self.guild_config(guild.id)
-        jail = guild_config.jail if guild_config else None
-        fake = f", or {' '.join(str(e) for e in emoji.resolve(guild, jail.jail_emoji))} if it's a fake" if jail else ""
-        text += f"\n-# React to the photo with your crest ({crests}) to verify it{fake}. {needed} of {len(council)} crests needed."
+        council_config = self.services.council.council(guild.id)
+        nay_spec = council_config.nay_vote_emoji if council_config else None
+        nay = f", or {' '.join(str(e) for e in emoji.resolve(guild, nay_spec))} if it's a fake" if nay_spec else ""
+        deadline = discord.utils.format_dt(utcnow() + config.vote_timeout, "R")
+        text += f"\n-# React to the photo with your crest ({crests}) to verify it{nay}. {needed} of {len(council)} votes decide it."
+        text += f"\n-# The council has until {deadline} before this snipe is thrown out."
         mentions = discord.AllowedMentions(users=[discord.Object(m.user_id) for m in council], replied_user=False)
         try:
             alert = await photo.reply(text, allowed_mentions=mentions)
@@ -205,31 +209,42 @@ class SnipesCog(BeansCog):
 
     # --- Votes --------------------------------------------------------------------------
 
+    def snipe_vote(self, payload: discord.RawReactionActionEvent) -> bool | None:
+        """
+        The vote a reaction in the snipe channel is: False for the owner's own crest, True for a council
+        member's nay. None if it isn't a vote. Doesn't check that the message is a snipe; the service does.
+        """
+        config = self.snipes_config(payload.guild_id)
+        if config is None or payload.channel_id != config.channel_id:
+            return None
+        owner = self.services.council.crest_owner(payload.guild_id, payload.emoji)
+        if owner is not None:
+            return False if owner.user_id == payload.user_id else None
+        if self.services.council.is_nay(payload.guild_id, payload.emoji) and self.services.council.member(payload.guild_id, payload.user_id):
+            return True
+        return None
+
     @BeansCog.listener()
     async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
         if payload.guild_id is None or self.is_own_user(payload.user_id):
             return
         owner = self.services.council.crest_owner(payload.guild_id, payload.emoji)
-        if owner is None:
-            return
-        if owner.user_id != payload.user_id:
+        if owner is not None and owner.user_id != payload.user_id:
             await self.remove_stolen_crest(payload)
             return
-        config = self.snipes_config(payload.guild_id)
-        if config is None or payload.channel_id != config.channel_id:
+        nay = self.snipe_vote(payload)
+        if nay is None:
             return
-        if await self.services.snipes.vote(payload.message_id, payload.user_id, self.services.council.majority(payload.guild_id)):
-            await self.announce_verified(payload.message_id)
+        if await self.services.snipes.vote(payload.message_id, payload.user_id, self.services.council.majority(payload.guild_id), nay=nay):
+            await self.announce_decided(payload.message_id)
 
     @BeansCog.listener()
     async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
         if payload.guild_id is None:
             return
-        owner = self.services.council.crest_owner(payload.guild_id, payload.emoji)
-        config = self.snipes_config(payload.guild_id)
-        if owner is None or owner.user_id != payload.user_id or config is None or payload.channel_id != config.channel_id:
-            return
-        await self.services.snipes.unvote(payload.message_id, payload.user_id)
+        nay = self.snipe_vote(payload)
+        if nay is not None:
+            await self.services.snipes.unvote(payload.message_id, payload.user_id, nay=nay)
 
     async def remove_stolen_crest(self, payload: discord.RawReactionActionEvent) -> None:
         message = await self.fetch_message(payload.channel_id, payload.message_id)
@@ -241,9 +256,17 @@ class SnipesCog(BeansCog):
         except discord.HTTPException:
             self.logger.warning(f"Could not remove stolen crest {payload.emoji} from {payload.user_id} in guild {payload.guild_id}")
 
-    async def announce_verified(self, message_id: int) -> None:
+    def council_names(self, guild_id: int, user_ids: list[int]) -> str:
+        names = []
+        for user_id in user_ids:
+            member = self.services.council.member(guild_id, user_id)
+            names.append(member.council_name if member else f"<@{user_id}>")
+        return join_names(names)
+
+    async def announce_decided(self, message_id: int) -> None:
+        """Replace the council ping with the verdict, and swap the photo's pending reaction for the outcome's."""
         snipe = await self.services.snipes.get(message_id)
-        if snipe is None:
+        if snipe is None or snipe.is_pending:
             return
         config = self.snipes_config(snipe.guild_id)
         guild = self.bot.get_guild(snipe.guild_id)
@@ -257,13 +280,21 @@ class SnipesCog(BeansCog):
             except discord.HTTPException:
                 self.logger.info(f"Could not delete council alert {alert.id}")
 
-        verifiers = []
-        for user_id in await self.services.snipes.voter_ids(message_id):
-            member = self.services.council.member(guild.id, user_id)
-            verifiers.append(member.council_name if member else f"<@{user_id}>")
-        names = {"sniper": f"<@{snipe.sniper_user_id}>", "target": f"<@{snipe.target_user_id}>", "verifiers": join_names(verifiers)}
-        text = scripts.pick(config.verified_scripts, **names)
-        text = text or f"The council has spoken: {names['sniper']} really did snipe {names['target']}. Verified by {names['verifiers']}."
+        names = {"sniper": f"<@{snipe.sniper_user_id}>", "target": f"<@{snipe.target_user_id}>"}
+        if snipe.verified_at is not None:
+            verifiers = self.council_names(guild.id, await self.services.snipes.voter_ids(message_id))
+            text = scripts.pick(config.verified_scripts, **names, verifiers=verifiers)
+            text = text or f"The council has spoken: {names['sniper']} really did snipe {names['target']}. Verified by {verifiers}."
+            outcome_emoji = config.verified_emoji
+        elif snipe.rejected_at is not None:
+            rejecters = self.council_names(guild.id, await self.services.snipes.voter_ids(message_id, nay=True))
+            text = scripts.pick(config.rejected_scripts, **names, rejecters=rejecters)
+            text = text or f"The council has spoken: that is not {names['target']}. {names['sniper']}'s snipe was thrown out by {rejecters}."
+            outcome_emoji = config.rejected_emoji
+        else:
+            text = scripts.pick(config.expired_scripts, **names)
+            text = text or f"The council couldn't be bothered to judge {names['sniper']}'s snipe of {names['target']}. It has expired."
+            outcome_emoji = config.expired_emoji
         mentions = discord.AllowedMentions(users=[discord.Object(snipe.sniper_user_id)], replied_user=False)
 
         photo = await self.fetch_message(snipe.channel_id, snipe.message_id)
@@ -272,37 +303,46 @@ class SnipesCog(BeansCog):
                 await channel.send(text, allowed_mentions=mentions)
             else:
                 await self.unreact(photo, config.pending_emoji)
-                await self.react(photo, config.verified_emoji)
+                await self.react(photo, outcome_emoji)
                 await photo.reply(text, allowed_mentions=mentions)
         except discord.HTTPException:
-            self.logger.warning(f"Could not announce verified snipe {message_id} in guild {guild.id}")
+            self.logger.warning(f"Could not announce decided snipe {message_id} in guild {guild.id}")
 
     # --- Timers -------------------------------------------------------------------------
 
+    async def recount(self, snipe: Snipe, photo: discord.Message) -> bool:
+        """Sync a pending snipe's votes with the photo's reactions. True if that decided it."""
+        yeas: set[int] = set()
+        nays: set[int] = set()
+        try:
+            for reaction in photo.reactions:
+                owner = self.services.council.crest_owner(snipe.guild_id, reaction.emoji)
+                is_nay = self.services.council.is_nay(snipe.guild_id, reaction.emoji)
+                if owner is None and not is_nay:
+                    continue
+                async for user in reaction.users():
+                    if owner is not None and user.id == owner.user_id:
+                        yeas.add(user.id)
+                    elif is_nay and self.services.council.member(snipe.guild_id, user.id):
+                        nays.add(user.id)
+        except discord.HTTPException:
+            self.logger.info(f"Could not recount votes on snipe {snipe.message_id}")
+            return False
+        return await self.services.snipes.sync_votes(snipe.message_id, yeas, nays, self.services.council.majority(snipe.guild_id))
+
     @tasks.loop(minutes=10)
     async def recount_pending(self):
-        """Catch crest reactions added or removed while the bot was down."""
+        """Catch votes added or removed while the bot was down, then expire snipes the council ignored."""
         for snipe in await self.services.snipes.pending():
-            if self.snipes_config(snipe.guild_id) is None:
+            config = self.snipes_config(snipe.guild_id)
+            if config is None:
                 continue
+            # A deleted photo can't be recounted, but it still expires.
             photo = await self.fetch_message(snipe.channel_id, snipe.message_id)
-            if photo is None:
-                continue
-            voters: set[int] = set()
-            try:
-                for reaction in photo.reactions:
-                    owner = self.services.council.crest_owner(snipe.guild_id, reaction.emoji)
-                    if owner is None:
-                        continue
-                    async for user in reaction.users():
-                        if user.id == owner.user_id:
-                            voters.add(owner.user_id)
-            except discord.HTTPException:
-                self.logger.info(f"Could not recount crests on snipe {snipe.message_id}")
-                continue
-            needed = self.services.council.majority(snipe.guild_id)
-            if await self.services.snipes.sync_votes(snipe.message_id, voters, needed):
-                await self.announce_verified(snipe.message_id)
+            decided = photo is not None and await self.recount(snipe, photo)
+            decided = decided or await self.services.snipes.expire_if_overdue(snipe.message_id, config.vote_timeout)
+            if decided:
+                await self.announce_decided(snipe.message_id)
 
     @recount_pending.before_loop
     async def before_recount_pending(self):

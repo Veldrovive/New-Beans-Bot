@@ -1,3 +1,5 @@
+import datetime
+
 import discord
 import pytest
 from pydantic import ValidationError
@@ -18,6 +20,7 @@ NEEDED = 3  # More than half of four
 
 def council_config(user_ids=TEDS) -> CouncilConfig:
     return CouncilConfig(
+        nay_vote_emoji=":honse:",
         members={
             f"ted{i}": CouncilMemberConfig(
                 internal_name=f"Ted {i}", ted_id=i, council_name=f"The Ted Number {i}", user_id=user_id, crest_emoji=f":crest{i}:"
@@ -51,6 +54,11 @@ def test_council_majority_and_crests():
     assert member is not None and member.council_name == "The Ted Number 4"
     assert council.member(GUILD, SNIPER) is None
     assert council.members(12345) == [] and council.crest_owner(12345, discord.PartialEmoji(name="crest1", id=1)) is None
+
+    assert council.is_nay(GUILD, discord.PartialEmoji(name="honse", id=99))
+    assert not council.is_nay(GUILD, discord.PartialEmoji(name="crest1", id=1))
+    assert council.crest_owner(GUILD, discord.PartialEmoji(name="honse", id=99)) is None
+    assert not council.is_nay(12345, discord.PartialEmoji(name="honse", id=99))
 
 
 def test_snipes_need_a_council():
@@ -100,9 +108,12 @@ async def test_taking_a_crest_back(snipes):
 async def test_votes_on_other_messages_do_nothing(snipes):
     assert not await snipes.vote(PHOTO, 10, 1)
     await snipes.unvote(PHOTO, 10)
-    assert not await snipes.sync_votes(PHOTO, {10}, 1)
+    assert not await snipes.vote(PHOTO, 10, 1, nay=True)
+    assert not await snipes.sync_votes(PHOTO, {10}, {20}, 1)
+    assert not await snipes.expire_if_overdue(PHOTO, datetime.timedelta(0))
     async with snipes.db.transaction() as session:
-        assert await session.get(SnipeVote, (PHOTO, 10)) is None
+        assert await session.get(SnipeVote, (PHOTO, 10, False)) is None
+        assert await session.get(SnipeVote, (PHOTO, 20, True)) is None
 
 
 async def test_sync_matches_reactions(snipes):
@@ -111,11 +122,11 @@ async def test_sync_matches_reactions(snipes):
     await snipes.vote(PHOTO, 20, NEEDED)
 
     # 20 took their crest back and 30 added theirs while the bot was down.
-    assert not await snipes.sync_votes(PHOTO, {10, 30}, NEEDED)
+    assert not await snipes.sync_votes(PHOTO, {10, 30}, set(), NEEDED)
     assert sorted(await snipes.voter_ids(PHOTO)) == [10, 30]
 
-    assert await snipes.sync_votes(PHOTO, {10, 20, 30}, NEEDED)
-    assert not await snipes.sync_votes(PHOTO, {10, 20, 30, 40}, NEEDED)  # Already verified
+    assert await snipes.sync_votes(PHOTO, {10, 20, 30}, set(), NEEDED)
+    assert not await snipes.sync_votes(PHOTO, {10, 20, 30, 40}, set(), NEEDED)  # Already verified
     assert sorted(await snipes.voter_ids(PHOTO)) == [10, 20, 30]
 
 
@@ -123,3 +134,69 @@ async def test_alert_message_is_remembered(snipes):
     await start(snipes)
     await snipes.set_alert_message(PHOTO, 777)
     assert (await snipes.get(PHOTO)).alert_message_id == 777
+
+
+async def test_majority_of_nays_rejects_once(snipes):
+    await start(snipes)
+    assert not await snipes.vote(PHOTO, 10, NEEDED, nay=True)
+    assert not await snipes.vote(PHOTO, 20, NEEDED, nay=True)
+    assert not await snipes.vote(PHOTO, 30, NEEDED)  # A crest doesn't count towards the nays
+    assert await snipes.vote(PHOTO, 40, NEEDED, nay=True)
+
+    snipe = await snipes.get(PHOTO)
+    assert snipe.rejected_at is not None and snipe.verified_at is None and not snipe.is_pending
+    assert await snipes.pending() == []
+    assert not await snipes.vote(PHOTO, 20, NEEDED)  # Already rejected: crests change nothing
+    assert not await snipes.vote(PHOTO, 40, NEEDED)
+    assert (await snipes.get(PHOTO)).verified_at is None
+    await snipes.unvote(PHOTO, 10, nay=True)  # Rejected snipes keep their nays
+    assert await snipes.voter_ids(PHOTO, nay=True) == [10, 20, 40]
+
+
+async def test_crest_and_nay_are_separate_votes(snipes):
+    await start(snipes)
+    await snipes.vote(PHOTO, 10, NEEDED)
+    await snipes.vote(PHOTO, 10, NEEDED, nay=True)  # Gaming the system is allowed
+    await snipes.unvote(PHOTO, 10, nay=True)
+    assert await snipes.voter_ids(PHOTO) == [10]
+    assert await snipes.voter_ids(PHOTO, nay=True) == []
+
+    await snipes.vote(PHOTO, 10, NEEDED, nay=True)
+    await snipes.vote(PHOTO, 20, NEEDED, nay=True)
+    assert await snipes.vote(PHOTO, 30, NEEDED, nay=True)
+    assert (await snipes.get(PHOTO)).rejected_at is not None
+
+
+async def test_sync_counts_nays_and_prefers_verified(snipes):
+    await start(snipes)
+    await snipes.vote(PHOTO, 10, NEEDED, nay=True)
+    assert not await snipes.sync_votes(PHOTO, set(), {20, 30}, NEEDED)  # 10 took their nay back
+    assert sorted(await snipes.voter_ids(PHOTO, nay=True)) == [20, 30]
+
+    # Both sides reached a majority while the bot was down.
+    assert await snipes.sync_votes(PHOTO, {10, 20, 30}, {20, 30, 40}, NEEDED)
+    snipe = await snipes.get(PHOTO)
+    assert snipe.verified_at is not None and snipe.rejected_at is None
+
+
+async def test_ignored_snipes_expire(snipes):
+    await start(snipes)
+    await snipes.vote(PHOTO, 10, NEEDED)
+    assert not await snipes.expire_if_overdue(PHOTO, datetime.timedelta(days=2))
+    assert (await snipes.get(PHOTO)).is_pending
+
+    assert await snipes.expire_if_overdue(PHOTO, datetime.timedelta(0))
+    assert not await snipes.expire_if_overdue(PHOTO, datetime.timedelta(0))  # Only once
+    snipe = await snipes.get(PHOTO)
+    assert snipe.expired_at is not None and snipe.verified_at is None and snipe.rejected_at is None
+    assert await snipes.pending() == []
+    assert not await snipes.vote(PHOTO, 20, 1)  # Too late to vote it through
+    assert not await snipes.sync_votes(PHOTO, {10, 20, 30}, set(), NEEDED)
+    assert (await snipes.get(PHOTO)).verified_at is None
+
+
+async def test_decided_snipes_dont_expire(snipes):
+    await start(snipes)
+    assert await snipes.vote(PHOTO, 10, 1)
+    assert not await snipes.expire_if_overdue(PHOTO, datetime.timedelta(0))
+    assert (await snipes.get(PHOTO)).expired_at is None

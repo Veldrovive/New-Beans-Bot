@@ -262,7 +262,7 @@ guilds:
         - "{previous_holder} has been thrown out of the penthouse! {buyer} paid {paid} to take their place. The new price is {new_price}."
         - "{previous_holder}'s yacht has been repossessed. {buyer} is the 1% now. The new price is {new_price}."
         - "Eat the rich! {previous_holder} has fallen and {buyer} has risen, {paid} poorer. The new price is {new_price}."
-    # The Council of Teds. Each member votes with their own crest emoji. Nobody else may use it.
+    # The Council of Teds. Each member votes for things with their own crest emoji, which nobody else may use, and against them with the shared nay emoji.
     council_of_teds:
       nay_vote_emoji: ":honse:"
       members:
@@ -303,7 +303,10 @@ guilds:
       channel_id: 1491887341353308221
       pending_emoji: ⏳
       verified_emoji: ✅
+      rejected_emoji: ❌
+      expired_emoji: 💤
       picker_timeout: 300
+      vote_timeout: 172800  # Two days
       picker_scripts:  # {sniper}
       - "Lovely photo, {sniper}. Who's the victim?"
       - "{sniper}, the council needs a name. Who did you catch?"
@@ -316,3 +319,11 @@ guilds:
       - "The council has spoken: {sniper} really did snipe {target}. Verified by {verifiers}."
       - "{target} has been caught in 4K. {verifiers} vouch for {sniper}'s snipe."
       - "Let it be recorded that {sniper} sniped {target}, as witnessed by {verifiers}."
+      rejected_scripts:  # {sniper}, {target}, {rejecters}
+      - "The council has spoken: that is not {target}. {sniper}'s snipe was thrown out by {rejecters}."
+      - "{rejecters} have examined the evidence and found it to be a blurry shrub. Nice try, {sniper}."
+      - "Fake news. {rejecters} reject {sniper}'s so-called snipe of {target}. Get your eyes checked."
+      expired_scripts:  # {sniper}, {target}
+      - "The council couldn't be bothered to judge {sniper}'s snipe of {target}. It has expired."
+      - "Two days and not a single verdict. {sniper}'s snipe of {target} dies in committee."
+      - "{sniper}'s snipe of {target} has been lost in the council's paperwork. Forever."

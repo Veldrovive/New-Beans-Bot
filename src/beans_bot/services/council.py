@@ -2,7 +2,8 @@
 The Council of Teds: a fixed set of members who vote on things with their crest emoji.
 
 - Each member owns one crest emoji. Nobody else may react with it.
-- A vote passes with more than half the council.
+- The council shares one nay emoji for voting against. Anyone may use it, but only council members' count.
+- A vote passes (or fails) with more than half the council.
 - This knows nothing about what's being voted on. Features like snipes ask it who's on the council.
 """
 
@@ -32,6 +33,11 @@ class CouncilService:
     def crest_owner(self, guild_id: int | None, reaction_emoji: discord.PartialEmoji | discord.Emoji | str) -> CouncilMemberConfig | None:
         """The member whose crest this is, or None if it isn't a crest."""
         return next((m for m in self.members(guild_id) if emoji.matches(reaction_emoji, m.crest_emoji)), None)
+
+    def is_nay(self, guild_id: int | None, reaction_emoji: discord.PartialEmoji | discord.Emoji | str) -> bool:
+        """True if this is the council's nay emoji. Anyone may react with it, but only the council's count."""
+        council = self.council(guild_id)
+        return council is not None and council.nay_vote_emoji is not None and emoji.matches(reaction_emoji, council.nay_vote_emoji)
 
     def majority(self, guild_id: int | None) -> int:
         """The fewest votes that are more than half the council."""

@@ -218,17 +218,26 @@ class CouncilConfig(StrictModel):
 
 
 class SnipesConfig(StrictModel):
-    """Photos of members posted in the snipe channel. The Council of Teds verifies them with crest reactions."""
+    """
+    Photos of members posted in the snipe channel. The Council of Teds verifies them with crest
+    reactions, or rejects them with its nay emoji.
+    """
 
     channel_id: int
     pending_emoji: str = "⏳"
     verified_emoji: str = "✅"
+    rejected_emoji: str = "❌"
+    expired_emoji: str = "💤"
     # How long the poster has to say who's in the photo when they tagged nobody (or too many people).
     picker_timeout: datetime.timedelta = datetime.timedelta(minutes=5)  # Hydra/YAML: seconds, or ISO 8601
+    # How long the council has to decide before the snipe is thrown out.
+    vote_timeout: datetime.timedelta = datetime.timedelta(days=2)  # Hydra/YAML: seconds, or ISO 8601
     picker_scripts: list[str] = []  # {sniper}
-    # Pings the council. Deleted and replaced by a verified script once enough crests are in.
+    # Pings the council. Deleted and replaced by one of the scripts below once the snipe is decided.
     alert_scripts: list[str] = []  # {council}, {sniper}, {target}
     verified_scripts: list[str] = []  # {sniper}, {target}, {verifiers}
+    rejected_scripts: list[str] = []  # {sniper}, {target}, {rejecters}
+    expired_scripts: list[str] = []  # {sniper}, {target}
 
 
 class GuildConfig(StrictModel):
