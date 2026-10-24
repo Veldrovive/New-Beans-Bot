@@ -1,6 +1,9 @@
 """
 VIP: day passes and the one permanent "1%" title, both bought with BeanCoins.
 
+- The 1% can appoint one henchman for free. The henchman is fired when the
+  title changes hands, in the same transaction as the claim.
+
 Each purchase pays the house and updates the records in one transaction, so two
 members can't both claim the title at the same price. The VIP cog keeps the
 Discord roles in line with these records.
@@ -34,11 +37,24 @@ class BidTooLow(Exception):
         self.price = price
 
 
+class NotOnePercent(Exception):
+    """Only the 1% can hire and fire henchmen."""
+
+
+class InvalidHenchman(Exception):
+    """The 1% tried to hire themselves."""
+
+
+class AlreadyHenchman(Exception):
+    """That member is already the henchman."""
+
+
 @dataclass
 class OnePercentClaim:
     previous_holder_id: int | None
     paid: int
     new_price: int
+    previous_henchman_id: int | None = None  # Fired by the claim
 
 
 class VipService:
@@ -136,6 +152,7 @@ class VipService:
                 to_user_id=self.coins.house_user_id,
             )
             previous_holder_id = title.holder_user_id if title else None
+            previous_henchman_id = title.henchman_user_id if title else None
             new_price = amount + config.price_increment
             if title is None:
                 title = OnePercentTitle(guild_id=guild_id, holder_user_id=user_id, paid=amount, price=new_price)
@@ -145,5 +162,39 @@ class VipService:
                 title.paid = amount
                 title.price = new_price
                 title.claimed_at = utcnow()
+                title.henchman_user_id = None  # The old boss's henchman doesn't come with the penthouse
         logger.info(f"{user_id} claimed the 1% in guild {guild_id} for {amount} (was {previous_holder_id})")
-        return OnePercentClaim(previous_holder_id=previous_holder_id, paid=amount, new_price=new_price)
+        return OnePercentClaim(
+            previous_holder_id=previous_holder_id, paid=amount, new_price=new_price, previous_henchman_id=previous_henchman_id
+        )
+
+    # --- Henchmen -----------------------------------------------------------------------
+
+    async def appoint_henchman(self, guild_id: int, boss_id: int, henchman_id: int) -> int | None:
+        """
+        Make `henchman_id` the 1%'s henchman, replacing any current one, whose ID is returned.
+        Raises NotOnePercent, InvalidHenchman or AlreadyHenchman.
+        """
+        async with self.db.transaction() as session:
+            title = await session.get(OnePercentTitle, guild_id)
+            if title is None or title.holder_user_id != boss_id:
+                raise NotOnePercent()
+            if henchman_id == boss_id:
+                raise InvalidHenchman()
+            if title.henchman_user_id == henchman_id:
+                raise AlreadyHenchman()
+            previous_henchman_id = title.henchman_user_id
+            title.henchman_user_id = henchman_id
+        logger.info(f"{boss_id} appointed {henchman_id} as henchman in guild {guild_id} (was {previous_henchman_id})")
+        return previous_henchman_id
+
+    async def dismiss_henchman(self, guild_id: int, boss_id: int) -> int | None:
+        """Fire the 1%'s henchman and return their ID, or None if there wasn't one. Raises NotOnePercent."""
+        async with self.db.transaction() as session:
+            title = await session.get(OnePercentTitle, guild_id)
+            if title is None or title.holder_user_id != boss_id:
+                raise NotOnePercent()
+            previous_henchman_id = title.henchman_user_id
+            title.henchman_user_id = None
+        logger.info(f"{boss_id} dismissed henchman {previous_henchman_id} in guild {guild_id}")
+        return previous_henchman_id

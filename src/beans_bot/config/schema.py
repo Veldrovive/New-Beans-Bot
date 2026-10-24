@@ -193,11 +193,19 @@ class OnePercentConfig(StrictModel):
     usurp_scripts: list[str] = []  # {buyer}, {previous_holder}, {paid}, {new_price}
 
 
+class HenchmanConfig(StrictModel):
+    role_id: int  # Give this role access to the VIP channel in Discord too
+    appoint_scripts: list[str] = []  # {boss}, {henchman}
+    dismiss_scripts: list[str] = []  # {boss}, {henchman}
+    unemployed_scripts: list[str] = []  # {henchman}, {previous_holder}, {buyer}. The 1% changed hands.
+
+
 class VipConfig(StrictModel):
-    """Two roles that both see the VIP channel (set up in Discord): a day pass, and one permanent title."""
+    """Roles that see the VIP channel (set up in Discord): a day pass, one permanent title, and its henchman."""
 
     day_pass: DayPassConfig
     one_percent: OnePercentConfig
+    henchman: HenchmanConfig | None = None  # Missing means the 1% can't appoint one
 
 
 class GuildConfig(StrictModel):

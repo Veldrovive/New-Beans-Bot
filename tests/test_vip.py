@@ -6,7 +6,7 @@ from beans_bot.config.schema import DayPassConfig, OnePercentConfig
 from beans_bot.db.models import CoinTransactionKind
 from beans_bot.db.types import utcnow
 from beans_bot.services.coins import InsufficientFunds
-from beans_bot.services.vip import AlreadyOnePercent, BidTooLow
+from beans_bot.services.vip import AlreadyHenchman, AlreadyOnePercent, BidTooLow, InvalidHenchman, NotOnePercent
 
 from conftest import GUILD, HOUSE
 
@@ -83,3 +83,49 @@ async def test_one_percent_needs_funds(vip, coins):
         await vip.claim_one_percent(GUILD, 1, 1000, ONE_PERCENT)
     assert await vip.one_percent(GUILD) is None
     assert await coins.balance(GUILD, 1) == 500
+
+
+async def test_henchman_appoint_and_dismiss(vip, coins):
+    await fund(coins, 1, 10)
+    with pytest.raises(NotOnePercent):
+        await vip.appoint_henchman(GUILD, 1, 2)  # Nobody holds the title yet
+    await vip.claim_one_percent(GUILD, 1, 1000, ONE_PERCENT)
+
+    with pytest.raises(NotOnePercent):
+        await vip.appoint_henchman(GUILD, 2, 3)
+    with pytest.raises(InvalidHenchman):
+        await vip.appoint_henchman(GUILD, 1, 1)
+    assert (await vip.one_percent(GUILD)).henchman_user_id is None
+
+    assert await vip.appoint_henchman(GUILD, 1, 2) is None
+    with pytest.raises(AlreadyHenchman):
+        await vip.appoint_henchman(GUILD, 1, 2)
+    assert await vip.appoint_henchman(GUILD, 1, 3) == 2
+    assert (await vip.one_percent(GUILD)).henchman_user_id == 3
+
+    with pytest.raises(NotOnePercent):
+        await vip.dismiss_henchman(GUILD, 3)
+    assert await vip.dismiss_henchman(GUILD, 1) == 3
+    assert await vip.dismiss_henchman(GUILD, 1) is None
+    assert (await vip.one_percent(GUILD)).henchman_user_id is None
+    # Henchmen are free
+    assert await coins.balance(GUILD, 1) == 0
+    assert await coins.balance(GUILD, HOUSE) == 1000
+
+
+async def test_usurping_fires_the_henchman(vip, coins):
+    await fund(coins, 1, 10)
+    await fund(coins, 2, 20)
+    await vip.claim_one_percent(GUILD, 1, 1000, ONE_PERCENT)
+    await vip.appoint_henchman(GUILD, 1, 3)
+
+    claim = await vip.claim_one_percent(GUILD, 2, 1100, ONE_PERCENT)
+    assert claim.previous_holder_id == 1 and claim.previous_henchman_id == 3
+    title = await vip.one_percent(GUILD)
+    assert (title.holder_user_id, title.henchman_user_id) == (2, None)
+
+    # A failed claim keeps the henchman
+    await vip.appoint_henchman(GUILD, 2, 3)
+    with pytest.raises(BidTooLow):
+        await vip.claim_one_percent(GUILD, 1, 100, ONE_PERCENT)
+    assert (await vip.one_percent(GUILD)).henchman_user_id == 3

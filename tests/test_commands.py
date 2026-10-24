@@ -29,7 +29,7 @@ async def test_commands_register(tmp_path: Path):
             "ping", "admin sync", "admin say", "admin dm", "robrole", "jail bribe", "jail frame", "jail current", "jail info", "jail leaderboard",
             "coins wealth", "coins leaderboard", "bet place", "bet add", "bet swap", "bet stats", "bet close", "bet cancel",
             "bet resolve", "admin botbet", "fatcow start", "fatcow consumed", "fatcow went", "fatcow leaderboard",
-            "vip daypass", "vip onepercent", "vip status",
+            "vip daypass", "vip henchman", "vip onepercent", "vip status",
         } <= names  # fmt: skip
         for command in bot.tree.get_commands():
             command.to_dict(bot.tree)

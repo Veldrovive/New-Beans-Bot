@@ -262,3 +262,15 @@ guilds:
         - "{previous_holder} has been thrown out of the penthouse! {buyer} paid {paid} to take their place. The new price is {new_price}."
         - "{previous_holder}'s yacht has been repossessed. {buyer} is the 1% now. The new price is {new_price}."
         - "Eat the rich! {previous_holder} has fallen and {buyer} has risen, {paid} poorer. The new price is {new_price}."
+      henchman:
+        role_id: 0  # TODO: real "Henchman" role ID. Also give it access to the VIP channel.
+        appoint_scripts:
+        - "{boss} has hired {henchman} as their henchman. Dental is not included."
+        - "{henchman} has sold their soul to {boss}. Welcome to the VIP lounge, lackey."
+        - "{boss} needed someone to hold the umbrella. {henchman} got the job."
+        dismiss_scripts:
+        - "{boss} has fired {henchman}. Security will escort you out."
+        - "{henchman} has been let go by {boss}. No severance, obviously."
+        unemployed_scripts:
+        - "{henchman} is out of a job. Their old boss can't afford them anymore."
+        - "{henchman} has been laid off in the restructuring. {buyer} brings their own goons."

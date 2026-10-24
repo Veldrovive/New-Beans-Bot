@@ -4,6 +4,8 @@ VIP: two BeanCoin-bought roles that can see the VIP channel (channel permissions
 - The bourgeoisie day pass: a flat price for a day of access. Buying again extends it.
 - The 1%: permanent access, but only one member holds it. Claim it by paying at
   least the current price. The next price is what you paid plus the increment.
+- The henchman: the 1% can hand one member a free henchman role that also sees
+  the VIP channel. The henchman is fired when the 1% changes hands.
 
 The roles follow the records: every minute, expired passes are ended and anyone
 who has a VIP role they didn't pay for loses it (and anyone missing one gets it).
@@ -20,7 +22,7 @@ from beans_bot.config.schema import VipConfig
 from beans_bot.services import scripts
 from beans_bot.services.coins import InsufficientFunds
 from beans_bot.services.jail import get_member
-from beans_bot.services.vip import AlreadyOnePercent, BidTooLow
+from beans_bot.services.vip import AlreadyHenchman, AlreadyOnePercent, BidTooLow, InvalidHenchman, NotOnePercent
 
 
 class VipCog(BeansCog):
@@ -105,6 +107,10 @@ class VipCog(BeansCog):
             if one_percent_role is not None:
                 title = await self.services.vip.one_percent(guild.id)
                 await self.sync_role(guild, one_percent_role, {title.holder_user_id} if title else set(), "The 1%")
+            if config.henchman is not None and (henchman_role := self.manageable_role(guild, config.henchman.role_id)):
+                title = await self.services.vip.one_percent(guild.id)
+                henchmen = {title.henchman_user_id} if title and title.henchman_user_id else set()
+                await self.sync_role(guild, henchman_role, henchmen, "henchman")
 
     async def sync_role(self, guild: discord.Guild, role: discord.Role, user_ids: set[int], name: str) -> None:
         for member in role.members:
@@ -197,6 +203,77 @@ class VipCog(BeansCog):
             names["previous_holder"] = f"<@{claim.previous_holder_id}>"
             text = scripts.pick(config.one_percent.usurp_scripts, **names)
             text = text or f"{interaction.user.mention} has usurped {names['previous_holder']}. The new price is {names['new_price']}."
+            if claim.previous_henchman_id is not None and config.henchman is not None:
+                await self.fire_henchman_role(interaction.guild, config.henchman.role_id, claim.previous_henchman_id, "The 1% changed hands.")
+                # A henchman who bought the title themselves got a promotion, not the sack
+                if claim.previous_henchman_id != interaction.user.id:
+                    henchman = f"<@{claim.previous_henchman_id}>"
+                    fired = scripts.pick(config.henchman.unemployed_scripts, henchman=henchman, **names)
+                    text += f"\n{fired or f'{henchman} is out of a job.'}"
+        await interaction.response.send_message(text)
+
+    async def fire_henchman_role(self, guild: discord.Guild, role_id: int, user_id: int, reason: str) -> None:
+        """Take the henchman role off right away. sync_roles would catch it within a minute anyway."""
+        member = await get_member(guild, user_id)
+        role = guild.get_role(role_id)
+        if member is not None and role is not None:
+            await self.set_role(member, role, False, reason)
+
+    @vip_group.command(name="henchman", description="1% only: appoint a henchman to share the VIP channel, or leave it empty to fire them.")
+    @app_commands.describe(member="Your new henchman. Leave it out to fire the current one.")
+    @requires_feature("vip")
+    @in_bot_channel()
+    async def henchman(self, interaction: discord.Interaction, member: discord.Member | None = None):
+        assert interaction.guild is not None
+        config = self.vip_config(interaction.guild_id)
+        assert config is not None
+        if config.henchman is None:
+            await interaction.response.send_message("Henchmen aren't hiring in this server. Do your own dirty work.", ephemeral=True)
+            return
+        role = self.manageable_role(interaction.guild, config.henchman.role_id)
+        if role is None:
+            await interaction.response.send_message("The henchman uniforms are locked up (I can't hand out that role).", ephemeral=True)
+            return
+        vip = self.services.vip
+        boss = interaction.user.mention
+
+        if member is None:
+            try:
+                fired_id = await vip.dismiss_henchman(interaction.guild.id, interaction.user.id)
+            except NotOnePercent:
+                await interaction.response.send_message("Only the 1% can afford a henchman. You can't even afford a sidekick.", ephemeral=True)
+                return
+            if fired_id is None:
+                await interaction.response.send_message("You don't have a henchman to fire. Lonely at the top, isn't it?", ephemeral=True)
+                return
+            await self.fire_henchman_role(interaction.guild, role.id, fired_id, "Fired by the 1%.")
+            henchman = f"<@{fired_id}>"
+            text = scripts.pick(config.henchman.dismiss_scripts, boss=boss, henchman=henchman)
+            await interaction.response.send_message(text or f"{boss} has fired {henchman}. Hand in your badge.")
+            return
+
+        if member.bot:
+            await interaction.response.send_message("Robots don't do henchwork. Pick a member with a pulse.", ephemeral=True)
+            return
+        try:
+            previous_id = await vip.appoint_henchman(interaction.guild.id, interaction.user.id, member.id)
+        except NotOnePercent:
+            await interaction.response.send_message("Only the 1% can afford a henchman. You can't even afford a sidekick.", ephemeral=True)
+            return
+        except InvalidHenchman:
+            await interaction.response.send_message("You can't be your own henchman. Delegate, you're rich now.", ephemeral=True)
+            return
+        except AlreadyHenchman:
+            await interaction.response.send_message(f"{member.mention} is already your henchman. They're working as hard as they can.", ephemeral=True)
+            return
+
+        if previous_id is not None:
+            await self.fire_henchman_role(interaction.guild, role.id, previous_id, "Replaced by the 1%.")
+        await self.set_role(member, role, True, "Appointed henchman by the 1%.")
+        text = scripts.pick(config.henchman.appoint_scripts, boss=boss, henchman=member.mention)
+        text = text or f"{boss} has hired {member.mention} as their henchman."
+        if previous_id is not None:
+            text += f"\n-# <@{previous_id}> has been let go."
         await interaction.response.send_message(text)
 
     @vip_group.command(name="status", description="Who holds the 1%, what it costs, and how long your day pass lasts.")
@@ -218,6 +295,8 @@ class VipCog(BeansCog):
                 f"since {discord.utils.format_dt(title.claimed_at, 'D')})",
                 f"- Price to usurp: {currency.format(title.price)}",
             ]
+            if config.henchman is not None:
+                lines.append(f"- Henchman: {f'<@{title.henchman_user_id}>' if title.henchman_user_id else 'none, the position is open'}")
         day_pass = await self.services.vip.active_pass(interaction.guild_id, interaction.user.id)
         lines.append("\n**Your day pass**")
         if day_pass is None:
