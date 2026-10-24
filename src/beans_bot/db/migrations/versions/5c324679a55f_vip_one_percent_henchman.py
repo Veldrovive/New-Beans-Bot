@@ -1,7 +1,7 @@
 """vip one percent henchman
 
 Revision ID: 5c324679a55f
-Revises: d76abcd4ad2c
+Revises: 8c10ac06b966
 Create Date: 2026-10-24 19:27:51.375681
 
 """
@@ -15,7 +15,7 @@ import beans_bot.db.types
 
 # revision identifiers, used by Alembic.
 revision: str = '5c324679a55f'
-down_revision: Union[str, Sequence[str], None] = 'd76abcd4ad2c'
+down_revision: Union[str, Sequence[str], None] = '8c10ac06b966'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

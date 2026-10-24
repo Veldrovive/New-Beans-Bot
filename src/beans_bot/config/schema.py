@@ -13,7 +13,7 @@ import zoneinfo
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, SecretStr, field_validator
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, SecretStr, field_validator, model_validator
 
 from beans_bot.currency import parse_amount
 
@@ -208,6 +208,46 @@ class VipConfig(StrictModel):
     henchman: HenchmanConfig | None = None  # Missing means the 1% can't appoint one
 
 
+class CouncilMemberConfig(StrictModel):
+    internal_name: str
+    ted_id: int
+    council_name: str  # "The Second True Ted"
+    epithets: list[str] = []
+    words: str = ""  # House words, like "Dempseram"
+    user_id: int
+    crest_emoji: str  # Only this member may react with it
+
+
+class CouncilConfig(StrictModel):
+    """The Council of Teds. Any feature can ask it for a vote. Each member votes with their own crest emoji."""
+
+    nay_vote_emoji: str | None = None
+    members: dict[str, CouncilMemberConfig]
+
+
+class SnipesConfig(StrictModel):
+    """
+    Photos of members posted in the snipe channel. The Council of Teds verifies them with crest
+    reactions, or rejects them with its nay emoji.
+    """
+
+    channel_id: int
+    pending_emoji: str = "⏳"
+    verified_emoji: str = "✅"
+    rejected_emoji: str = "❌"
+    expired_emoji: str = "💤"
+    # How long the poster has to say who's in the photo when they tagged nobody (or too many people).
+    picker_timeout: datetime.timedelta = datetime.timedelta(minutes=5)  # Hydra/YAML: seconds, or ISO 8601
+    # How long the council has to decide before the snipe is thrown out.
+    vote_timeout: datetime.timedelta = datetime.timedelta(days=2)  # Hydra/YAML: seconds, or ISO 8601
+    picker_scripts: list[str] = []  # {sniper}
+    # Pings the council. Deleted and replaced by one of the scripts below once the snipe is decided.
+    alert_scripts: list[str] = []  # {council}, {sniper}, {target}
+    verified_scripts: list[str] = []  # {sniper}, {target}, {verifiers}
+    rejected_scripts: list[str] = []  # {sniper}, {target}, {rejecters}
+    expired_scripts: list[str] = []  # {sniper}, {target}
+
+
 class GuildConfig(StrictModel):
     name: str
     active: bool = True
@@ -222,6 +262,14 @@ class GuildConfig(StrictModel):
     classifier: ClassifierGuildConfig | None = None
     role_name: RoleNameConfig | None = None
     vip: VipConfig | None = None
+    council_of_teds: CouncilConfig | None = None
+    snipes: SnipesConfig | None = None
+
+    @model_validator(mode="after")
+    def _snipes_need_a_council(self) -> GuildConfig:
+        if self.snipes is not None and self.council_of_teds is None:
+            raise ValueError("snipes needs a council_of_teds section to verify them")
+        return self
 
 
 # --- Root -----------------------------------------------------------------------------

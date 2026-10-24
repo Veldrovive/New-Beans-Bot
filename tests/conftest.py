@@ -5,6 +5,7 @@ from beans_bot.db.engine import Database
 from beans_bot.services.coins import CoinService
 from beans_bot.services.jail import JailService
 from beans_bot.services.markets import MarketService
+from beans_bot.services.snipes import SnipeService
 from beans_bot.services.vip import VipService
 
 GUILD = 1
@@ -38,3 +39,8 @@ def markets(db, coins, jail):
 @pytest.fixture
 def vip(db, coins):
     return VipService(db, coins)
+
+
+@pytest.fixture
+def snipes(db):
+    return SnipeService(db)

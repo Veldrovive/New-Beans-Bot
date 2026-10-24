@@ -260,3 +260,45 @@ guilds:
         unemployed_scripts:
         - "{henchman} is out of a job. Their old boss can't afford them anymore."
         - "{henchman} has been laid off in the restructuring. {buyer} brings their own goons."
+    # The Council of Teds. Each member votes for things with their own crest emoji, which nobody else may use, and against them with the shared nay emoji.
+    # Only Aidan is on the dev server. The dempseram crest must exist there as a custom emoji.
+    council_of_teds:
+      nay_vote_emoji: ":honse:"
+      members:
+        aidan:
+          internal_name: "Aidan"
+          ted_id: 2
+          council_name: "The Second True Ted"
+          epithets: ["The Botfather", "The Usurper"]
+          words: "Dempseram"
+          user_id: 728600387501686836
+          crest_emoji: ":dempseram:"
+    # Snipes: photos of members in the snipe channel, verified by the council's crest reactions.
+    snipes:
+      channel_id: 1561929729706041395
+      pending_emoji: ⏳
+      verified_emoji: ✅
+      rejected_emoji: ❌
+      expired_emoji: 💤
+      picker_timeout: 300
+      vote_timeout: 172800  # Two days
+      picker_scripts:  # {sniper}
+      - "Lovely photo, {sniper}. Who's the victim?"
+      - "{sniper}, the council needs a name. Who did you catch?"
+      - "A snipe with no victim is just a photo, {sniper}. Who is it?"
+      alert_scripts:  # {council}, {sniper}, {target}
+      - "{council}: the council is summoned! {sniper} claims to have sniped {target}."
+      - "{council}: {sniper} has brought evidence against {target}. Judge it."
+      - "Hear ye, {council}! {sniper} swears this is {target}. Is it?"
+      verified_scripts:  # {sniper}, {target}, {verifiers}
+      - "The council has spoken: {sniper} really did snipe {target}. Verified by {verifiers}."
+      - "{target} has been caught in 4K. {verifiers} vouch for {sniper}'s snipe."
+      - "Let it be recorded that {sniper} sniped {target}, as witnessed by {verifiers}."
+      rejected_scripts:  # {sniper}, {target}, {rejecters}
+      - "The council has spoken: that is not {target}. {sniper}'s snipe was thrown out by {rejecters}."
+      - "{rejecters} have examined the evidence and found it to be a blurry shrub. Nice try, {sniper}."
+      - "Fake news. {rejecters} reject {sniper}'s so-called snipe of {target}. Get your eyes checked."
+      expired_scripts:  # {sniper}, {target}
+      - "The council couldn't be bothered to judge {sniper}'s snipe of {target}. It has expired."
+      - "Two days and not a single verdict. {sniper}'s snipe of {target} dies in committee."
+      - "{sniper}'s snipe of {target} has been lost in the council's paperwork. Forever."
