@@ -306,6 +306,7 @@ guilds:
     manifesto:
       authors:
         728600387501686836: sophia
+        1: tori  # Not on dev. A placeholder ID so random picks include her manifesto.
       intro_scripts:  # {author}
       - "{author} has spoken. Write this down:"
       - "From the collected wisdom of {author}:"

@@ -1,4 +1,5 @@
 import json
+import random
 
 import pytest
 
@@ -31,6 +32,18 @@ def test_random_picks_stay_in_range(manifesto):
         wisdom = manifesto.pick(GUILD)
         assert wisdom.author_id in (SOPHIA, TED) and 1 <= wisdom.index <= wisdom.total
         assert manifesto.pick(GUILD, TED).index == 1
+
+
+def test_random_picks_are_even_per_manifesto(manifesto):
+    # A second member sharing Ted's manifesto mustn't double its odds, and Sophia's longer one mustn't outweigh it.
+    manifesto.config.guilds[GUILD].manifesto.authors[30] = "ted"
+    random.seed(0)
+    picks = [manifesto.pick(GUILD) for _ in range(4000)]
+    ted = sum(p.author_id in (TED, 30) for p in picks) / len(picks)
+    assert 0.46 < ted < 0.54
+    # Then even within the manifesto
+    sophia = [p.index for p in picks if p.author_id == SOPHIA]
+    assert all(abs(sophia.count(i) / len(sophia) - 1 / 3) < 0.04 for i in (1, 2, 3))
 
 
 def test_index_without_member_picks_a_deep_enough_author(manifesto):

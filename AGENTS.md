@@ -103,7 +103,7 @@ Use the VIP feature (`cogs/vip.py`, `services/vip.py`, `db/models/vip.py`, `test
 Manifestos live in `manifestos/<name>/`: the member's own file (`manifesto.rtf` or whatever they sent) next to a `wisdom.json`. The bot only ever reads `wisdom.json`, because manifestos can be personal.
 
 1. Move the file to `manifestos/<name>/`.
-2. Read it and write `wisdom.json`: a JSON list of strings, one opinion each, in the author's voice. Leave out anything personal: other people's and pets' names, ages, places, confessions, and notes addressed to someone. Generalize an opinion rather than quote a private detail. Skip anything that's only personal.
+2. Read it and write `wisdom.json`: a JSON list of strings, one piece of wisdom each, in the author's own words. Wisdom is loosely defined. It's any line worth the bot espousing out of context: opinions, lessons, threats, non sequiturs, bits ("This cigarette tastes like plastic. It is made out of plastic.", "Go piss girl."). Keep the author's wording and repetition, and split long passages into lines that stand alone. Leave out anything personal: replace other people's and pets' names with "someone", and drop ages, workplaces, places, confessions, and notes addressed to a specific person. Skip a line only if it's nothing but personal detail.
 3. Map the member's Discord user ID to `<name>` under `manifesto.authors` in both `dev.yaml` and `prod.yaml`.
 4. Run `uv run pytest`. `test_manifesto_authors_have_wisdom` checks that every mapped folder has valid wisdom.
 

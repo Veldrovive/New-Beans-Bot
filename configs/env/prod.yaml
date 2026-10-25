@@ -343,6 +343,7 @@ guilds:
     manifesto:
       authors:
         0: sophia  # TODO: Sophia's real Discord user ID
+        1: tori  # TODO: Tori's real Discord user ID
       intro_scripts:  # {author}
       - "{author} has spoken. Write this down:"
       - "From the collected wisdom of {author}:"
