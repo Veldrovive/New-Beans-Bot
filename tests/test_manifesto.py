@@ -3,6 +3,7 @@ import random
 
 import pytest
 
+from beans_bot.cogs.manifesto import chunk_lines
 from beans_bot.config.schema import BotConfig, GuildConfig, ManifestoConfig
 from beans_bot.services.manifesto import ManifestoService, NoManifesto, NoSuchWisdom
 
@@ -69,3 +70,23 @@ def test_bad_wisdom_file(manifesto, tmp_path):
     manifesto._wisdom.clear()
     with pytest.raises(ValueError):
         manifesto.wisdom("ted")
+
+
+def test_list_one_or_all_manifestos(manifesto):
+    [sophia] = manifesto.manifestos(GUILD, SOPHIA)
+    assert (sophia.author_id, sophia.wisdom) == (SOPHIA, ["Oreos go in water.", "Rugs are bad.", "Octagonal windows."])
+    # Members sharing a manifesto show it once, under the first of them
+    manifesto.config.guilds[GUILD].manifesto.authors[30] = "ted"
+    assert [(m.author_id, len(m.wisdom)) for m in manifesto.manifestos(GUILD)] == [(SOPHIA, 3), (TED, 1)]
+    with pytest.raises(NoManifesto):
+        manifesto.manifestos(GUILD, 40)
+    with pytest.raises(NoManifesto):
+        manifesto.manifestos(GUILD + 1)
+
+
+def test_chunk_lines_stays_under_the_limit():
+    lines = [f"line {i} " + "x" * 30 for i in range(20)]
+    chunks = chunk_lines(lines, limit=100)
+    assert all(len(c) <= 100 for c in chunks)
+    assert "\n".join(chunks).split("\n") == lines
+    assert chunk_lines(["short"]) == ["short"]

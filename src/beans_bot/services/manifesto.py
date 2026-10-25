@@ -38,6 +38,12 @@ class Wisdom:
     text: str
 
 
+@dataclass
+class Manifesto:
+    author_id: int
+    wisdom: list[str]
+
+
 class ManifestoService:
     def __init__(self, config: BotConfig):
         self.config = config
@@ -56,6 +62,18 @@ class ManifestoService:
                 raise ValueError(f"{path} should be a non-empty list of strings")
             self._wisdom[name] = wisdom
         return self._wisdom[name]
+
+    def manifestos(self, guild_id: int | None, user_id: int | None = None) -> list[Manifesto]:
+        """One member's manifesto, or every one in the guild (once each, even if members share one). Raises NoManifesto."""
+        authors = self.authors(guild_id)
+        if user_id is not None:
+            if user_id not in authors:
+                raise NoManifesto()
+            return [Manifesto(author_id=user_id, wisdom=self.wisdom(authors[user_id]))]
+        first_author = {name: author_id for author_id, name in reversed(authors.items())}
+        if not first_author:
+            raise NoManifesto()
+        return [Manifesto(author_id=a, wisdom=self.wisdom(name)) for name, a in sorted(first_author.items())]
 
     def pick(self, guild_id: int | None, user_id: int | None = None, index: int | None = None) -> Wisdom:
         """
