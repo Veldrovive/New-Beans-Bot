@@ -263,7 +263,7 @@ guilds:
         - "{previous_holder}'s yacht has been repossessed. {buyer} is the 1% now. The new price is {new_price}."
         - "Eat the rich! {previous_holder} has fallen and {buyer} has risen, {paid} poorer. The new price is {new_price}."
       henchman:
-        role_id: 0  # TODO: real "Henchman" role ID. Also give it access to the VIP channel.
+        role_id: 1563961691321008268
         appoint_scripts:
         - "{boss} has hired {henchman} as their henchman. Dental is not included."
         - "{henchman} has sold their soul to {boss}. Welcome to the VIP lounge, lackey."
@@ -342,7 +342,7 @@ guilds:
     # Discord user ID -> folder under manifestos/ with a wisdom.json
     manifesto:
       authors:
-        0: sophia  # TODO: Sophia's real Discord user ID
+        462778210094940160: sophia  # TODO: Sophia's real Discord user ID
       intro_scripts:  # {author}
       - "{author} has spoken. Write this down:"
       - "From the collected wisdom of {author}:"
