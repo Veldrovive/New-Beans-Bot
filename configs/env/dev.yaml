@@ -313,3 +313,8 @@ guilds:
       - "From the collected wisdom of {author}:"
       - "The prophet {author} once said:"
       - "Gather round, children. {author}'s manifesto teaches us:"
+      reply_scripts:  # {imparter}, {author}, {target}. When wisdom is imparted as a reply to a message.
+      - "{imparter} thinks that the wisdom of {author} will help you in this time, {target}."
+      - "{target}, {imparter} has consulted the manifesto of {author} on your behalf:"
+      - "{imparter} sees that {target} is lost. Let {author} light the way:"
+      - "{target} needs guidance. {imparter} has opened the sacred texts of {author}:"

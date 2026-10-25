@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import discord
+
 from beans_bot.bot import BeansBot
 from beans_bot.cogs.action_holiday import ActionHolidayCog
 from beans_bot.cogs.admin import AdminCog
@@ -33,6 +35,7 @@ async def test_commands_register(tmp_path: Path):
             "bet resolve", "admin botbet", "fatcow start", "fatcow consumed", "fatcow went", "fatcow leaderboard",
             "vip daypass", "vip henchman", "vip onepercent", "vip status", "manifesto wisdom", "manifesto list",
         } <= names  # fmt: skip
+        assert bot.tree.get_command("Impart wisdom", type=discord.AppCommandType.message) is not None
         for command in bot.tree.get_commands():
             command.to_dict(bot.tree)
         admin = bot.tree.get_command("admin")

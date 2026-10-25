@@ -254,6 +254,8 @@ class ManifestoConfig(StrictModel):
     # Discord user ID -> folder under manifestos_dir holding that member's wisdom.json
     authors: dict[int, str]
     intro_scripts: list[str] = []  # {author}
+    # Used instead of intro_scripts when wisdom is imparted as a reply to someone's message
+    reply_scripts: list[str] = []  # {imparter}, {author}, {target}
 
 
 class GuildConfig(StrictModel):
