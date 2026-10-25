@@ -248,6 +248,14 @@ class SnipesConfig(StrictModel):
     expired_scripts: list[str] = []  # {sniper}, {target}
 
 
+class ManifestoConfig(StrictModel):
+    """Members' manifestos. The bot only ever quotes the wisdom pulled out of them, never the manifesto itself."""
+
+    # Discord user ID -> folder under manifestos_dir holding that member's wisdom.json
+    authors: dict[int, str]
+    intro_scripts: list[str] = []  # {author}
+
+
 class GuildConfig(StrictModel):
     name: str
     active: bool = True
@@ -264,6 +272,7 @@ class GuildConfig(StrictModel):
     vip: VipConfig | None = None
     council_of_teds: CouncilConfig | None = None
     snipes: SnipesConfig | None = None
+    manifesto: ManifestoConfig | None = None
 
     @model_validator(mode="after")
     def _snipes_need_a_council(self) -> GuildConfig:
@@ -278,6 +287,7 @@ class GuildConfig(StrictModel):
 class BotConfig(StrictModel):
     bot_token: SecretStr
     db_path: Path = Path("data/beans.db")
+    manifestos_dir: Path = Path("manifestos")
     timezone: str = "America/Detroit"
     daily_post_time: datetime.time = datetime.time(hour=10)
     sync_commands_on_startup: bool = True

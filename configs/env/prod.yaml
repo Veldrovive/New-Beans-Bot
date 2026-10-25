@@ -339,3 +339,12 @@ guilds:
       - "The council couldn't be bothered to judge {sniper}'s snipe of {target}. It has expired."
       - "Two days and not a single verdict. {sniper}'s snipe of {target} dies in committee."
       - "{sniper}'s snipe of {target} has been lost in the council's paperwork. Forever."
+    # Discord user ID -> folder under manifestos/ with a wisdom.json
+    manifesto:
+      authors:
+        0: sophia  # TODO: Sophia's real Discord user ID
+      intro_scripts:  # {author}
+      - "{author} has spoken. Write this down:"
+      - "From the collected wisdom of {author}:"
+      - "The prophet {author} once said:"
+      - "Gather round, children. {author}'s manifesto teaches us:"

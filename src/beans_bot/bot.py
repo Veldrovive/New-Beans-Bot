@@ -67,12 +67,13 @@ class BeansBot(commands.Bot):
         from beans_bot.cogs.fat_cow import FatCowCog
         from beans_bot.cogs.gambling import GamblingCog
         from beans_bot.cogs.jail import JailCog
+        from beans_bot.cogs.manifesto import ManifestoCog
         from beans_bot.cogs.role_name import RoleNameCog
         from beans_bot.cogs.snipes import SnipesCog
         from beans_bot.cogs.tomatoes import TomatoesCog
         from beans_bot.cogs.vip import VipCog
 
-        for cog in (BasicCog, AdminCog, RoleNameCog, JailCog, TomatoesCog, CoinsCog, GamblingCog, FatCowCog, BirthdayCog, ActionHolidayCog, VipCog, SnipesCog):
+        for cog in (BasicCog, AdminCog, RoleNameCog, JailCog, TomatoesCog, CoinsCog, GamblingCog, FatCowCog, BirthdayCog, ActionHolidayCog, VipCog, SnipesCog, ManifestoCog):
             await self.add_cog(cog(self))
 
         if self._classifier_wanted():
