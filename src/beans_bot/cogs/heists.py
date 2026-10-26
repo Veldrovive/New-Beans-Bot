@@ -138,7 +138,7 @@ class HeistCog(BeansCog):
         text = scripts.pick(config.begin_scripts, **values)
         text = text or f"The heist on {values['target']} is on. Your codeword is {values['code']}. Don't write it down."
         text += (
-            f"\nTell people the codeword **in real life**. They join with `/heist join`. You need at least {config.min_crew} "
+            f"\nTell people the codeword **in real life**. If you do it over text, you are lame. They join with `/heist join`. You need at least {config.min_crew} "
             f"people, you included. If anyone in the crew gets a verified snipe of {target.mention}, the crew splits:\n"
             f"{self.cut_table(balance, config)}\n"
             f"-# Anyone with the codeword can `/heist snitch`. Then the whole crew goes to jail and pays the house "

@@ -332,17 +332,18 @@ guilds:
       - "{author} has nailed a fresh thesis to the door:"
       ghostwritten_scripts:  # {writer}, {author}. When the 1% adds wisdom to someone else's manifesto.
       - "{writer} has generously decided what {author} believes now:"
-      - "By decree of the 1%, {writer} has amended the manifesto of {author}:"
       - "{author} didn't write this, but {writer} paid for it, so it's canon:"
     # Heists: rob a member with a crew recruited in real life. Succeeds on a verified snipe of the target by the crew.
     heists:
-      min_crew: 4  # The leader counts
+      min_crew: 2  # The leader counts
       cuts:  # Crew size -> percent of the target's coins stolen. Bigger crews get the biggest size listed.
-        4: 10
-        5: 15
-        6: 20
-        7: 25
-        8: 30
+        2: 20
+        3: 25
+        4: 30
+        5: 45
+        6: 55
+        7: 70
+        8: 100
       duration: P3D
       snitch_fine_percent: 25
       snitch_reward_percent: 50
