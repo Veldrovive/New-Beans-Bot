@@ -30,13 +30,6 @@ def has_image(message: discord.Message) -> bool:
     return any((a.content_type or "").startswith("image/") for a in message.attachments)
 
 
-def join_names(names: list[str]) -> str:
-    """ "a", "a and b", "a, b and c"."""
-    if len(names) <= 1:
-        return "".join(names)
-    return f"{', '.join(names[:-1])} and {names[-1]}"
-
-
 class TargetSelect(discord.ui.Select):
     """Picks one of the members the poster tagged."""
 
@@ -261,13 +254,15 @@ class SnipesCog(BeansCog):
         for user_id in user_ids:
             member = self.services.council.member(guild_id, user_id)
             names.append(member.council_name if member else f"<@{user_id}>")
-        return join_names(names)
+        return scripts.join_names(names)
 
     async def announce_decided(self, message_id: int) -> None:
         """Replace the council ping with the verdict, and swap the photo's pending reaction for the outcome's."""
         snipe = await self.services.snipes.get(message_id)
         if snipe is None or snipe.is_pending:
             return
+        if snipe.verified_at is not None:
+            self.bot.dispatch("snipe_verified", snipe)  # Heists listen for this
         config = self.snipes_config(snipe.guild_id)
         guild = self.bot.get_guild(snipe.guild_id)
         channel = self.bot.get_channel(snipe.channel_id)

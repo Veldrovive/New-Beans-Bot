@@ -13,3 +13,10 @@ def pick(scripts: list[str], **values: object) -> str | None:
     if not scripts:
         return None
     return random.choice(scripts).format_map(_KeepMissing(values))
+
+
+def join_names(names: list[str]) -> str:
+    """ "a", "a and b", "a, b and c"."""
+    if len(names) <= 1:
+        return "".join(names)
+    return f"{', '.join(names[:-1])} and {names[-1]}"

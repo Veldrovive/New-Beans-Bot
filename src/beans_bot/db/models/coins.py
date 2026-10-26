@@ -27,6 +27,9 @@ class CoinTransactionKind(StrEnum):
     HOUSE_REMAINDER = "house_remainder"  # Market escrow -> house (rounding leftovers)
     VIP_DAY_PASS = "vip_day_pass"  # Member -> house
     VIP_ONE_PERCENT = "vip_one_percent"  # Member -> house, to claim the one permanent VIP title
+    HEIST_LOOT = "heist_loot"  # Target -> crew member, when a crew member's snipe of them is verified
+    HEIST_FINE = "heist_fine"  # Crew member (or the snitch) -> house, when a heist is snitched on
+    HEIST_SNITCH_REWARD = "heist_snitch_reward"  # House -> snitch, a while after the snitching
     MIGRATION_OPENING = "migration_opening"  # Balance carried over from the old bot
 
 

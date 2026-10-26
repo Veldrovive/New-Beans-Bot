@@ -168,6 +168,18 @@ class VipService:
             previous_holder_id=previous_holder_id, paid=amount, new_price=new_price, previous_henchman_id=previous_henchman_id
         )
 
+    async def _revoke_one_percent(self, session: AsyncSession, guild_id: int, user_id: int) -> OnePercentTitle | None:
+        """
+        Take the title from `user_id` if they hold it, and return the old record. With no record the
+        price goes back to the starting price, and the henchman goes with it.
+        """
+        title = await session.get(OnePercentTitle, guild_id)
+        if title is None or title.holder_user_id != user_id:
+            return None
+        await session.delete(title)
+        logger.info(f"{user_id} lost the 1% in guild {guild_id} (henchman {title.henchman_user_id} fired)")
+        return title
+
     # --- Henchmen -----------------------------------------------------------------------
 
     async def appoint_henchman(self, guild_id: int, boss_id: int, henchman_id: int) -> int | None:

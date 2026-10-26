@@ -11,6 +11,7 @@ class JailReason(StrEnum):
     FRAME = "frame"
     SWAP = "swap"  # Swapped a bet
     RIGGED = "rigged"  # Beat the house alone in a market. Can't bet until released.
+    HEIST = "heist"  # In a heist crew (or snitched on one)
     DESYNC = "desync"  # Had the jail role but no record
 
 

@@ -260,6 +260,34 @@ class SnipesConfig(StrictModel):
     expired_scripts: list[str] = []  # {sniper}, {target}
 
 
+class HeistConfig(StrictModel):
+    """
+    Crews rob a member by sniping them. The leader passes the codeword around in real life;
+    anyone holding it can join, or snitch and send the whole crew to jail.
+    """
+
+    min_crew: int = 4  # The leader counts
+    # Crew size -> percent of the target's balance stolen. Bigger crews get the biggest size listed.
+    cuts: dict[int, int] = {4: 10, 5: 15, 6: 20, 7: 25, 8: 30}
+    duration: datetime.timedelta = datetime.timedelta(days=3)  # Hydra/YAML: seconds, or ISO 8601
+    snitch_fine_percent: int = 25  # Of each crew member's (and the snitch's) balance, paid to the house
+    snitch_reward_percent: int = 50  # Of all the fines, paid by the house to the snitch after the delay
+    snitch_reward_delay: datetime.timedelta = datetime.timedelta(days=1)  # So the payout doesn't give them away
+    fallback_codewords: list[str] = []  # Used when the random noun API is down
+    begin_scripts: list[str] = []  # {leader}, {target}, {code}. Private; the cut table is added after.
+    success_scripts: list[str] = []  # {target}, {crew}, {sniper}, {loot}
+    dethroned_scripts: list[str] = []  # {target}. Added when the target was the 1%.
+    snitched_scripts: list[str] = []  # {target}, {crew}, {fined}
+    snitch_reward_scripts: list[str] = []  # {reward}. Sent to the snitch by DM.
+    expired_scripts: list[str] = []  # {target}. Sent to the crew by DM.
+
+    @model_validator(mode="after")
+    def _cuts_cover_min_crew(self) -> HeistConfig:
+        if not self.cuts or min(self.cuts) > self.min_crew:
+            raise ValueError("heists.cuts needs an entry at or below min_crew")
+        return self
+
+
 class ManifestoConfig(StrictModel):
     """Members' manifestos. The bot only ever quotes the wisdom pulled out of them, never the manifesto itself."""
 
@@ -292,11 +320,18 @@ class GuildConfig(StrictModel):
     council_of_teds: CouncilConfig | None = None
     snipes: SnipesConfig | None = None
     manifesto: ManifestoConfig | None = None
+    heists: HeistConfig | None = None
 
     @model_validator(mode="after")
     def _snipes_need_a_council(self) -> GuildConfig:
         if self.snipes is not None and self.council_of_teds is None:
             raise ValueError("snipes needs a council_of_teds section to verify them")
+        return self
+
+    @model_validator(mode="after")
+    def _heists_need_snipes_and_jail(self) -> GuildConfig:
+        if self.heists is not None and (self.snipes is None or self.jail is None):
+            raise ValueError("heists needs snipes (to succeed) and jail (for snitches)")
         return self
 
     @model_validator(mode="after")

@@ -11,6 +11,7 @@ from beans_bot.services.auto_bets import AutoBetService
 from beans_bot.services.coins import CoinService
 from beans_bot.services.council import CouncilService
 from beans_bot.services.gemini import GeminiService
+from beans_bot.services.heists import HeistService
 from beans_bot.services.jail import JailService
 from beans_bot.services.manifesto import ManifestoService
 from beans_bot.services.markets import MarketService
@@ -31,6 +32,7 @@ class Services:
     council: CouncilService
     snipes: SnipeService
     manifesto: ManifestoService
+    heists: HeistService
     gemini: GeminiService
 
     @classmethod
@@ -52,5 +54,6 @@ class Services:
             council=CouncilService(config),
             snipes=SnipeService(db),
             manifesto=ManifestoService(config, db, vip),
+            heists=HeistService(db, coins, vip),
             gemini=GeminiService(config.gemini),
         )

@@ -13,6 +13,7 @@ from beans_bot.cogs.birthday import BirthdayCog
 from beans_bot.cogs.coins import CoinsCog
 from beans_bot.cogs.fat_cow import FatCowCog
 from beans_bot.cogs.gambling import GamblingCog
+from beans_bot.cogs.heists import HeistCog
 from beans_bot.cogs.jail import JailCog
 from beans_bot.cogs.manifesto import ManifestoCog
 from beans_bot.cogs.role_name import RoleNameCog
@@ -21,7 +22,7 @@ from beans_bot.cogs.tomatoes import TomatoesCog
 from beans_bot.cogs.vip import VipCog
 from beans_bot.config.schema import BotConfig
 
-COGS = (BasicCog, AdminCog, RoleNameCog, JailCog, TomatoesCog, CoinsCog, GamblingCog, AutoBetsCog, FatCowCog, BirthdayCog, ActionHolidayCog, VipCog, SnipesCog, ManifestoCog)
+COGS = (BasicCog, AdminCog, RoleNameCog, JailCog, TomatoesCog, CoinsCog, GamblingCog, AutoBetsCog, FatCowCog, BirthdayCog, ActionHolidayCog, VipCog, SnipesCog, ManifestoCog, HeistCog)
 
 
 async def test_commands_register(tmp_path: Path):
@@ -35,7 +36,7 @@ async def test_commands_register(tmp_path: Path):
             "coins wealth", "coins leaderboard", "bet place", "bet add", "bet swap", "bet stats", "bet close", "bet cancel",
             "bet resolve", "admin botbet", "autobet post", "fatcow start", "fatcow consumed", "fatcow went", "fatcow leaderboard",
             "vip daypass", "vip henchman", "vip onepercent", "vip status", "manifesto wisdom", "manifesto list",
-            "manifesto add", "manifesto edit", "manifesto remove",
+            "manifesto add", "manifesto edit", "manifesto remove", "heist begin", "heist join", "heist snitch",
         } <= names  # fmt: skip
         assert bot.tree.get_command("Impart wisdom", type=discord.AppCommandType.message) is not None
         for command in bot.tree.get_commands():
