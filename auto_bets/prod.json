@@ -1,14 +1,16 @@
 [
   {
     "bet": "{person} will leave the building before {time}",
-    "params": {"person": ["Andy", "Aidan"], "time": "5pm"},
-    "bot_bet": [1, 5],
+    "params": {"person": ["Andy", "Aidan"], "time": ["5pm", "2pm"]},
+    "choices": ["yes", "no"],
+    "bot_bet": [5, 15],
     "admins": [728600387501686836, 1405215475688018002]
   },
   {
     "bet": "Who gets thrown in jail first {when}?",
-    "params": {"when": ["today", "this week"]},
-    "choices": ["ted", "aidan", "andy", "jace", "nobody"],
-    "admins": [728600387501686836]
+    "params": {"when": ["today"]},
+    "choices": ["ted", "aidan", "andy", "jace", "tori", "nobody"],
+    "bot_bet": [10, 20],
+    "admins": [728600387501686836, 754118059203100767]
   }
 ]

@@ -84,10 +84,7 @@ guilds:
       post_time: "09:00"  # In `timezone`
       post_probability: 1.0
       intro_scripts:  # {bet}
-      - "The house has a question, and it smells like money: {bet}"
-      - "I've been watching you all. Place your bets: {bet}"
-      - "Today's sure thing, according to nobody: {bet}"
-      - "Hear ye! The bookie is open. {bet}"
+      - "{bet}"
     birthday:
       birthdays_message_channel_id: 1491581488238690418
       birthdays_message_id: 1491581499818905742
