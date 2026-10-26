@@ -5,20 +5,27 @@ Manifestos: the bot espouses wisdom from members' manifestos.
 - /manifesto list privately shows the numbered wisdom, so you can choose what to impart.
 - "Impart wisdom" in a message's Apps menu replies to that message with wisdom, using the reply scripts.
   Slash commands can't be replies, so this is how wisdom lands on a specific message.
+- /manifesto add puts a new piece of wisdom at the end of your own manifesto. Anyone can, so anyone can start one.
+  /manifesto edit and /manifesto remove change what you added. The original manifesto can't be touched.
 - All of it works in any channel.
 - Only the extracted wisdom is ever quoted. The manifestos themselves stay private.
 """
 
 from __future__ import annotations
 
+from collections.abc import Coroutine
+from typing import Any
+
 import discord
 from discord import app_commands
 
 from beans_bot.cogs.base import BeansCog, requires_feature
 from beans_bot.services import scripts
-from beans_bot.services.manifesto import NoManifesto, NoSuchWisdom, Wisdom
+from beans_bot.services.errors import UserFacingError
+from beans_bot.services.manifesto import NoManifesto, NoSuchWisdom, NotYourWisdom, Wisdom, WrittenInStone
 
 MESSAGE_LIMIT = 2000  # Discord's cap on one message
+WisdomText = app_commands.Range[str, 1, 1000]  # Leaves room for the intro and footer in one message
 
 
 def no_manifesto_text(member_id: int | None) -> str:
@@ -90,7 +97,7 @@ class ManifestoCog(BeansCog):
     async def pick(self, interaction: discord.Interaction, author_id: int | None, index: int | None) -> Wisdom | None:
         """A piece of wisdom, or None after telling the member why there isn't one."""
         try:
-            return self.services.manifesto.pick(interaction.guild_id, author_id, index)
+            return await self.services.manifesto.pick(interaction.guild_id, author_id, index)
         except NoManifesto:
             text = no_manifesto_text(author_id)
         except NoSuchWisdom as e:
@@ -128,7 +135,7 @@ class ManifestoCog(BeansCog):
     async def list_wisdom(self, interaction: discord.Interaction, member: discord.Member | None = None):
         none = discord.AllowedMentions.none()
         try:
-            manifestos = self.services.manifesto.manifestos(interaction.guild_id, member.id if member else None)
+            manifestos = await self.services.manifesto.manifestos(interaction.guild_id, member.id if member else None)
         except NoManifesto:
             await interaction.response.send_message(no_manifesto_text(member.id if member else None), ephemeral=True, allowed_mentions=none)
             return
@@ -144,6 +151,70 @@ class ManifestoCog(BeansCog):
         await interaction.response.send_message(chunks[0], ephemeral=True, allowed_mentions=none)
         for chunk in chunks[1:]:
             await interaction.followup.send(chunk, ephemeral=True, allowed_mentions=none)
+
+    @manifesto_group.command(name="add", description="Add a new piece of wisdom to your own manifesto.")
+    @app_commands.describe(statement="The wisdom. It goes at the end of your manifesto.")
+    @requires_feature("manifesto")
+    async def add(self, interaction: discord.Interaction, statement: WisdomText):
+        assert interaction.guild_id is not None
+        config = self.guild_config(interaction.guild_id)
+        assert config is not None and config.manifesto is not None
+        statement = statement.strip()
+        if not statement:
+            raise UserFacingError("That's blank. Even for a manifesto, you have to say something.")
+        wisdom = await self.services.manifesto.add(interaction.guild_id, interaction.user.id, statement)
+        author = interaction.user.mention
+        intro = scripts.pick(config.manifesto.added_scripts, author=author) or f"{author} has amended their manifesto:"
+        await interaction.response.send_message(wisdom_text(intro, wisdom), allowed_mentions=discord.AllowedMentions.none())
+
+    @manifesto_group.command(name="edit", description="Rewrite a piece of wisdom you added to your manifesto.")
+    @app_commands.describe(wisdom_index="Which piece of your wisdom (see /manifesto list)", statement="What it should say now")
+    @requires_feature("manifesto")
+    async def edit(self, interaction: discord.Interaction, wisdom_index: app_commands.Range[int, 1], statement: WisdomText):
+        guild_id = interaction.guild_id
+        assert guild_id is not None
+        statement = statement.strip()
+        if not statement:
+            raise UserFacingError("Editing it to nothing? Use /manifesto remove, coward.")
+        old = await self.change(interaction, wisdom_index, self.services.manifesto.edit(guild_id, interaction.user.id, wisdom_index, statement))
+        if old is not None:
+            await interaction.response.send_message(f"Revised. History will forget you ever said \"{old}\".\n> {statement}", ephemeral=True)
+
+    @manifesto_group.command(name="remove", description="Take back a piece of wisdom you added to your manifesto.")
+    @app_commands.describe(wisdom_index="Which piece of your wisdom (see /manifesto list)")
+    @requires_feature("manifesto")
+    async def remove(self, interaction: discord.Interaction, wisdom_index: app_commands.Range[int, 1]):
+        guild_id = interaction.guild_id
+        assert guild_id is not None
+        old = await self.change(interaction, wisdom_index, self.services.manifesto.remove(guild_id, interaction.user.id, wisdom_index))
+        if old is not None:
+            await interaction.response.send_message(
+                f"Retracted. \"{old}\" was never said.\n-# Your later wisdom moves up a number", ephemeral=True
+            )
+
+    async def change(self, interaction: discord.Interaction, index: int, operation: Coroutine[Any, Any, str]) -> str | None:
+        """Await an edit or remove, or tell the member why they can't and return None."""
+        try:
+            return await operation
+        except NoManifesto:
+            text = "You have no manifesto to edit. Write one first with /manifesto add."
+        except NoSuchWisdom as e:
+            text = f"There's no wisdom #{index}. Your manifesto stops at {e.most}. Short, but punchy."
+        except WrittenInStone:
+            text = f"Wisdom #{index} is from your original manifesto, and that's written in stone. You only get to change what you added."
+        except NotYourWisdom:
+            text = f"Someone else added wisdom #{index}. Hands off their thoughts."
+        await interaction.response.send_message(text, ephemeral=True)
+        return None
+
+    async def _own_wisdom_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[int]]:
+        if interaction.guild_id is None:
+            return []
+        own = await self.services.manifesto.own_wisdom(interaction.guild_id, interaction.user.id)
+        return [app_commands.Choice(name=f"{w.index}. {w.text}"[:100], value=w.index) for w in own if current.lower() in f"{w.index}. {w.text}".lower()][:25]
+
+    edit.autocomplete("wisdom_index")(_own_wisdom_autocomplete)
+    remove.autocomplete("wisdom_index")(_own_wisdom_autocomplete)
 
     # --- Replying with wisdom -----------------------------------------------------------
 

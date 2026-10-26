@@ -47,6 +47,6 @@ class Services:
             vip=VipService(db, coins),
             council=CouncilService(config),
             snipes=SnipeService(db),
-            manifesto=ManifestoService(config),
+            manifesto=ManifestoService(config, db),
             gemini=GeminiService(config.gemini),
         )

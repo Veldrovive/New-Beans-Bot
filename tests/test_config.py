@@ -37,11 +37,11 @@ def test_inactive_guilds_are_hidden(monkeypatch):
 
 
 @pytest.mark.parametrize("env", ["dev", "prod"])
-def test_manifesto_authors_have_wisdom(env, monkeypatch):
+async def test_manifesto_authors_have_wisdom(env, monkeypatch, db):
     monkeypatch.setenv("BOT_TOKEN", "test-token")
     config = load(env)
     config.manifestos_dir = CONFIG_DIR.parent / "manifestos"
-    manifesto = ManifestoService(config)
+    manifesto = ManifestoService(config, db)
     for guild_id, guild in config.guilds.items():
         for name in manifesto.authors(guild_id).values():
             assert manifesto.wisdom(name), f"{name} has no wisdom"

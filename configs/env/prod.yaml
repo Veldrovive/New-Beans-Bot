@@ -354,3 +354,8 @@ guilds:
       - "{target}, {imparter} has consulted the manifesto of {author} on your behalf:"
       - "{imparter} sees that {target} is lost. Let {author} light the way:"
       - "{target} needs guidance. {imparter} has opened the sacred texts of {author}:"
+      added_scripts:  # {author}. When a member adds wisdom to their own manifesto.
+      - "{author} has amended their manifesto. The scholars are already arguing about it:"
+      - "Breaking: {author} has had another thought."
+      - "A new verse has been added to the gospel of {author}:"
+      - "{author} has nailed a fresh thesis to the door:"

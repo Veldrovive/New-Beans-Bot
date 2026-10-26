@@ -256,6 +256,8 @@ class ManifestoConfig(StrictModel):
     intro_scripts: list[str] = []  # {author}
     # Used instead of intro_scripts when wisdom is imparted as a reply to someone's message
     reply_scripts: list[str] = []  # {imparter}, {author}, {target}
+    # Posted with the new wisdom when a member adds to their manifesto
+    added_scripts: list[str] = []  # {author}
 
 
 class GuildConfig(StrictModel):
