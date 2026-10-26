@@ -258,6 +258,8 @@ class ManifestoConfig(StrictModel):
     reply_scripts: list[str] = []  # {imparter}, {author}, {target}
     # Posted with the new wisdom when a member adds to their manifesto
     added_scripts: list[str] = []  # {author}
+    # Instead of added_scripts when the 1% adds wisdom to someone else's manifesto
+    ghostwritten_scripts: list[str] = []  # {writer}, {author}
 
 
 class GuildConfig(StrictModel):

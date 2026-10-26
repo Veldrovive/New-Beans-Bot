@@ -6,6 +6,7 @@ Manifestos: the bot espouses wisdom from members' manifestos.
 - "Impart wisdom" in a message's Apps menu replies to that message with wisdom, using the reply scripts.
   Slash commands can't be replies, so this is how wisdom lands on a specific message.
 - /manifesto add puts a new piece of wisdom at the end of your own manifesto. Anyone can, so anyone can start one.
+  The 1% can name another member and put words in their manifesto instead.
   /manifesto edit and /manifesto remove change what you added. The original manifesto can't be touched.
 - All of it works in any channel.
 - Only the extracted wisdom is ever quoted. The manifestos themselves stay private.
@@ -22,7 +23,7 @@ from discord import app_commands
 from beans_bot.cogs.base import BeansCog, requires_feature
 from beans_bot.services import scripts
 from beans_bot.services.errors import UserFacingError
-from beans_bot.services.manifesto import NoManifesto, NoSuchWisdom, NotYourWisdom, Wisdom, WrittenInStone
+from beans_bot.services.manifesto import NoManifesto, NoSuchWisdom, NotTheOnePercent, NotYourWisdom, Wisdom, WrittenInStone
 
 MESSAGE_LIMIT = 2000  # Discord's cap on one message
 WisdomText = app_commands.Range[str, 1, 1000]  # Leaves room for the intro and footer in one message
@@ -152,19 +153,36 @@ class ManifestoCog(BeansCog):
         for chunk in chunks[1:]:
             await interaction.followup.send(chunk, ephemeral=True, allowed_mentions=none)
 
-    @manifesto_group.command(name="add", description="Add a new piece of wisdom to your own manifesto.")
-    @app_commands.describe(statement="The wisdom. It goes at the end of your manifesto.")
+    @manifesto_group.command(name="add", description="Add a new piece of wisdom to your manifesto (or, for the 1%, anyone's).")
+    @app_commands.describe(
+        statement="The wisdom. It goes at the end of the manifesto.",
+        member="Whose manifesto to add to. Only the 1% may pick someone else. Leave it out for your own.",
+    )
     @requires_feature("manifesto")
-    async def add(self, interaction: discord.Interaction, statement: WisdomText):
+    async def add(self, interaction: discord.Interaction, statement: WisdomText, member: discord.Member | None = None):
         assert interaction.guild_id is not None
         config = self.guild_config(interaction.guild_id)
         assert config is not None and config.manifesto is not None
         statement = statement.strip()
         if not statement:
             raise UserFacingError("That's blank. Even for a manifesto, you have to say something.")
-        wisdom = await self.services.manifesto.add(interaction.guild_id, interaction.user.id, statement)
-        author = interaction.user.mention
-        intro = scripts.pick(config.manifesto.added_scripts, author=author) or f"{author} has amended their manifesto:"
+        author_id = member.id if member else interaction.user.id
+        try:
+            wisdom = await self.services.manifesto.add(interaction.guild_id, author_id, statement, writer_id=interaction.user.id)
+        except NotTheOnePercent:
+            await interaction.response.send_message(
+                f"Only the 1% gets to put words in {member.mention if member else 'their'} mouth. Buy the title, or write your own manifesto.",
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+        author = f"<@{author_id}>"
+        if author_id == interaction.user.id:
+            intro = scripts.pick(config.manifesto.added_scripts, author=author) or f"{author} has amended their manifesto:"
+        else:
+            writer = interaction.user.mention
+            intro = scripts.pick(config.manifesto.ghostwritten_scripts, writer=writer, author=author)
+            intro = intro or f"{writer}, in their infinite wealth, has amended the manifesto of {author}:"
         await interaction.response.send_message(wisdom_text(intro, wisdom), allowed_mentions=discord.AllowedMentions.none())
 
     @manifesto_group.command(name="edit", description="Rewrite a piece of wisdom you added to your manifesto.")

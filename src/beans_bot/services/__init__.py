@@ -37,6 +37,7 @@ class Services:
         currency = CurrencySystem(cheddar_enabled=config.currency.cheddar_enabled)
         coins = CoinService(db, currency)
         jail = JailService(db, coins)
+        vip = VipService(db, coins)
         return cls(
             config=config,
             db=db,
@@ -44,9 +45,9 @@ class Services:
             coins=coins,
             jail=jail,
             markets=MarketService(db, coins, jail),
-            vip=VipService(db, coins),
+            vip=vip,
             council=CouncilService(config),
             snipes=SnipeService(db),
-            manifesto=ManifestoService(config, db),
+            manifesto=ManifestoService(config, db, vip),
             gemini=GeminiService(config.gemini),
         )

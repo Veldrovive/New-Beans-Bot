@@ -323,3 +323,7 @@ guilds:
       - "Breaking: {author} has had another thought."
       - "A new verse has been added to the gospel of {author}:"
       - "{author} has nailed a fresh thesis to the door:"
+      ghostwritten_scripts:  # {writer}, {author}. When the 1% adds wisdom to someone else's manifesto.
+      - "{writer} has generously decided what {author} believes now:"
+      - "By decree of the 1%, {writer} has amended the manifesto of {author}:"
+      - "{author} didn't write this, but {writer} paid for it, so it's canon:"

@@ -5,6 +5,7 @@ Manifestos: members write one, and the bot quotes the wisdom in it.
   opinions pulled out of it. The raw manifesto can be personal, so the bot never reads it.
 - Each guild's config maps a member's user ID to their manifesto folder.
 - Any member can add wisdom to their own manifesto with /manifesto add, even without a folder.
+  The 1% can also add wisdom to anyone else's. It's still that member's to edit or remove.
   Added wisdom lives in the database and comes after the wisdom.json lines. Members can edit or
   remove what they added, but the wisdom.json lines are written in stone.
 - Wisdom is numbered from 1. Leave out the member or the number and one is picked at random:
@@ -26,6 +27,7 @@ from beans_bot.config.schema import BotConfig
 from beans_bot.db.engine import Database
 from beans_bot.db.models import ManifestoWisdom
 from beans_bot.db.types import utcnow
+from beans_bot.services.vip import VipService
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,10 @@ class NoSuchWisdom(Exception):
 
 class WrittenInStone(Exception):
     """That wisdom came from the manifesto file, so it can't be edited from Discord."""
+
+
+class NotTheOnePercent(Exception):
+    """Only the 1% may put words in someone else's manifesto."""
 
 
 class NotYourWisdom(Exception):
@@ -86,9 +92,10 @@ class Manifesto:
 
 
 class ManifestoService:
-    def __init__(self, config: BotConfig, db: Database):
+    def __init__(self, config: BotConfig, db: Database, vip: VipService):
         self.config = config
         self.db = db
+        self.vip = vip
         self._wisdom: dict[str, list[str]] = {}
 
     def authors(self, guild_id: int | None) -> dict[int, str]:
@@ -184,15 +191,22 @@ class ManifestoService:
 
     # --- Writing ----------------------------------------------------------------------
 
-    async def add(self, guild_id: int, user_id: int, text: str) -> Wisdom:
-        """Add wisdom to the end of the member's manifesto, starting one if they have none."""
+    async def add(self, guild_id: int, user_id: int, text: str, writer_id: int | None = None) -> Wisdom:
+        """
+        Add wisdom to the end of the member's manifesto, starting one if they have none. A writer other
+        than the member must hold the 1% title, or this raises NotTheOnePercent.
+        """
+        if writer_id is not None and writer_id != user_id:
+            title = await self.vip.one_percent(guild_id)
+            if title is None or title.holder_user_id != writer_id:
+                raise NotTheOnePercent()
         async with self.db.transaction() as session:
             row = ManifestoWisdom(guild_id=guild_id, author_user_id=user_id, text=text)
             session.add(row)
             await session.flush()
             manifesto = await self._of(session, guild_id, user_id)
         index = next(i for i, line in enumerate(manifesto.lines, start=1) if line.added_id == row.id)
-        logger.info(f"{user_id} added wisdom {index} (row {row.id}) to their manifesto in guild {guild_id}")
+        logger.info(f"{writer_id or user_id} added wisdom {index} (row {row.id}) to the manifesto of {user_id} in guild {guild_id}")
         return manifesto.wisdom_at(index, user_id)
 
     async def edit(self, guild_id: int, user_id: int, index: int, text: str) -> str:

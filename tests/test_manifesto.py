@@ -5,7 +5,9 @@ import pytest
 
 from beans_bot.cogs.manifesto import chunk_lines
 from beans_bot.config.schema import BotConfig, GuildConfig, ManifestoConfig
-from beans_bot.services.manifesto import ManifestoService, NoManifesto, NoSuchWisdom, NotYourWisdom, WrittenInStone
+from beans_bot.config.schema import OnePercentConfig
+from beans_bot.db.models import CoinTransactionKind
+from beans_bot.services.manifesto import ManifestoService, NoManifesto, NoSuchWisdom, NotTheOnePercent, NotYourWisdom, WrittenInStone
 
 from conftest import GUILD
 
@@ -14,13 +16,13 @@ TED = 20
 
 
 @pytest.fixture
-def manifesto(tmp_path, db):
+def manifesto(tmp_path, db, vip):
     (tmp_path / "manifestos").mkdir()
     for name, wisdom in {"sophia": ["Oreos go in water.", "Rugs are bad.", "Octagonal windows."], "ted": ["Be Ted."]}.items():
         (tmp_path / "manifestos" / name).mkdir()
         (tmp_path / "manifestos" / name / "wisdom.json").write_text(json.dumps(wisdom))
     guild = GuildConfig(name="test", manifesto=ManifestoConfig(authors={SOPHIA: "sophia", TED: "ted"}))
-    return ManifestoService(BotConfig(bot_token="x", manifestos_dir=tmp_path / "manifestos", guilds={GUILD: guild}), db)
+    return ManifestoService(BotConfig(bot_token="x", manifestos_dir=tmp_path / "manifestos", guilds={GUILD: guild}), db, vip)
 
 
 async def test_pick_by_member_and_index(manifesto):
@@ -134,6 +136,27 @@ async def test_shared_manifesto_lines_belong_to_who_added_them(manifesto):
         await manifesto.edit(GUILD, TED, 2, "Hijacked.")
     assert await manifesto.own_wisdom(GUILD, TED) == []
     assert await manifesto.edit(GUILD, 30, 2, "Ted's twin speaks louder.") == "Ted's twin speaks."
+
+
+async def test_only_the_one_percent_writes_for_others(manifesto, vip, coins):
+    with pytest.raises(NotTheOnePercent):
+        await manifesto.add(GUILD, SOPHIA, "Planted.", writer_id=TED)  # Nobody holds the title yet
+    async with coins.db.transaction() as session:
+        await coins.move(session, guild_id=GUILD, amount=1000, kind=CoinTransactionKind.REACTION, to_user_id=TED)
+    await vip.claim_one_percent(GUILD, TED, 1000, OnePercentConfig(role_id=2, starting_price=10))
+    with pytest.raises(NotTheOnePercent):
+        await manifesto.add(GUILD, TED, "Reverse uno.", writer_id=SOPHIA)
+    assert (await manifesto.manifestos(GUILD, TED))[0].wisdom == ["Be Ted."]
+
+    wisdom = await manifesto.add(GUILD, SOPHIA, "Ted is right.", writer_id=TED)
+    assert (wisdom.author_id, wisdom.index) == (SOPHIA, 4)
+    await manifesto.add(GUILD, 30, "A whole new manifesto.", writer_id=TED)
+    assert (await manifesto.pick(GUILD, 30, 1)).author_id == 30
+    # It's the member's wisdom now, not the writer's
+    assert await manifesto.own_wisdom(GUILD, TED) == []
+    assert [w.text for w in await manifesto.own_wisdom(GUILD, SOPHIA)] == ["Ted is right."]
+    assert await manifesto.remove(GUILD, SOPHIA, 4) == "Ted is right."
+    await manifesto.add(GUILD, TED, "Writing for myself is free.", writer_id=TED)
 
 
 def test_chunk_lines_stays_under_the_limit():
