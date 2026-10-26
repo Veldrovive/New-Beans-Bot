@@ -7,6 +7,7 @@ import discord
 from beans_bot.bot import BeansBot
 from beans_bot.cogs.action_holiday import ActionHolidayCog
 from beans_bot.cogs.admin import AdminCog
+from beans_bot.cogs.auto_bets import AutoBetsCog
 from beans_bot.cogs.basic import BasicCog
 from beans_bot.cogs.birthday import BirthdayCog
 from beans_bot.cogs.coins import CoinsCog
@@ -20,7 +21,7 @@ from beans_bot.cogs.tomatoes import TomatoesCog
 from beans_bot.cogs.vip import VipCog
 from beans_bot.config.schema import BotConfig
 
-COGS = (BasicCog, AdminCog, RoleNameCog, JailCog, TomatoesCog, CoinsCog, GamblingCog, FatCowCog, BirthdayCog, ActionHolidayCog, VipCog, SnipesCog, ManifestoCog)
+COGS = (BasicCog, AdminCog, RoleNameCog, JailCog, TomatoesCog, CoinsCog, GamblingCog, AutoBetsCog, FatCowCog, BirthdayCog, ActionHolidayCog, VipCog, SnipesCog, ManifestoCog)
 
 
 async def test_commands_register(tmp_path: Path):
@@ -32,7 +33,7 @@ async def test_commands_register(tmp_path: Path):
         assert {
             "ping", "admin sync", "admin say", "admin dm", "robrole", "jail bribe", "jail frame", "jail current", "jail info", "jail leaderboard",
             "coins wealth", "coins leaderboard", "bet place", "bet add", "bet swap", "bet stats", "bet close", "bet cancel",
-            "bet resolve", "admin botbet", "fatcow start", "fatcow consumed", "fatcow went", "fatcow leaderboard",
+            "bet resolve", "admin botbet", "autobet post", "fatcow start", "fatcow consumed", "fatcow went", "fatcow leaderboard",
             "vip daypass", "vip henchman", "vip onepercent", "vip status", "manifesto wisdom", "manifesto list",
             "manifesto add", "manifesto edit", "manifesto remove",
         } <= names  # fmt: skip

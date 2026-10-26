@@ -141,7 +141,7 @@ async def test_swap_rules(markets, coins, db, market):
 
 
 async def test_only_creator_manages(markets, market):
-    with pytest.raises(UserFacingError, match="creator"):
+    with pytest.raises(UserFacingError, match="managers"):
         await markets.close(THREAD, 1)
     await markets.close(THREAD, CREATOR)
     with pytest.raises(UserFacingError, match="currently closed"):

@@ -21,6 +21,8 @@ class PredictionMarket(SQLModel, table=True):
     thread_id: int = Field(primary_key=True, sa_column_kwargs={"autoincrement": False})
     guild_id: int = Field(index=True)
     creator_id: int
+    # Members besides the creator who may close, cancel and resolve it. Automatic bets name theirs.
+    admin_ids: list[int] = Field(default_factory=list, sa_column=Column(JSON, nullable=False, server_default="[]"))
     status: str = MarketStatus.OPEN
     choices: list[str] = Field(sa_column=Column(JSON, nullable=False))
     created_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)

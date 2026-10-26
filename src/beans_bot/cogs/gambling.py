@@ -1,7 +1,8 @@
 """
 Prediction markets. A new thread in the guild's gambling forum, whose first
 message lists `Choices:`, becomes a betting pool. Members bet BeanCoins with
-/bet, and the thread's creator closes, cancels or resolves it.
+/bet, and the thread's creator closes, cancels or resolves it. The bot posts
+automatic bets itself (see cogs/auto_bets.py), and their admins manage them.
 - /bet place and /bet add take "all in" as an amount to bet the member's whole balance.
 - /bet swap moves a member's whole bet to another choice, but it pings
   @everyone in the bot channel and sends them to jail.
@@ -24,25 +25,7 @@ from beans_bot.db.models import JailReason
 from beans_bot.services import scripts
 from beans_bot.services.errors import UserFacingError
 from beans_bot.services.jail import JailOutcome
-from beans_bot.services.markets import InvalidMarket, parse_choices
-
-
-def market_instructions(choices: list[str], creator_id: int) -> str:
-    lines = ["Time to gamble!", "", "Place a bet with `/bet place`:"]
-    lines += [f"- `/bet place choice:{choice} amount:<coins>`" for choice in choices]
-    lines += [
-        "You may only choose one option.",
-        "However, if you want to lose more money you can use `/bet add` to increase your bet.",
-        "Changed your mind? `/bet swap` moves your whole bet, but it tells @everyone and sends you to jail.",
-        "If I'm the only loser and it resolves right away, I'll assume you cheated, and cheaters don't bet from jail.",
-        "Check the pool and odds: `/bet stats`",
-        "",
-        f"Commands for the prediction market manager, <@{creator_id}>:",
-        "- Close betting and refund everyone: `/bet cancel`",
-        "- Close betting without naming a winner yet: `/bet close`",
-        "- Close betting and name a winner: `/bet resolve`",
-    ]
-    return "\n".join(lines)
+from beans_bot.services.markets import InvalidMarket, market_instructions, parse_choices
 
 
 class GamblingCog(BeansCog):
@@ -59,6 +42,8 @@ class GamblingCog(BeansCog):
         forum_id = self.forum_channel_id(thread.guild.id)
         if forum_id is None or thread.parent_id != forum_id:
             return
+        if thread.owner_id is not None and self.is_own_user(thread.owner_id):
+            return  # An automatic bet. The auto bets cog sets up its market.
         config = self.guild_config(thread.guild.id)
         assert config is not None and config.gambling is not None
 
@@ -79,7 +64,7 @@ class GamblingCog(BeansCog):
         await self.services.markets.create(
             guild_id=thread.guild.id, thread_id=thread.id, creator_id=starter.author.id, choices=choices
         )
-        await thread.send(market_instructions(choices, starter.author.id))
+        await thread.send(market_instructions(choices, [starter.author.id]))
 
         amount = await self.services.markets.auto_bet_amount(thread.guild.id, config.gambling.bot_betting)
         if amount is not None:
@@ -227,17 +212,17 @@ class GamblingCog(BeansCog):
                 lines.append(f"- **{choice}**: {currency.format(total)} bet (Payout ratio: {stats.pool / total:.2f}x)")
         await interaction.response.send_message("\n".join(lines), ephemeral=quiet)
 
-    @bet.command(name="close", description="Market creator: stop accepting bets without naming a winner yet.")
+    @bet.command(name="close", description="Market manager: stop accepting bets without naming a winner yet.")
     async def close(self, interaction: discord.Interaction):
         await self.services.markets.close(self._thread_id(interaction), interaction.user.id)
         await interaction.response.send_message("Betting has been closed.")
 
-    @bet.command(name="cancel", description="Market creator: cancel the market and refund everyone.")
+    @bet.command(name="cancel", description="Market manager: cancel the market and refund everyone.")
     async def cancel(self, interaction: discord.Interaction):
         await self.services.markets.cancel(self._thread_id(interaction), interaction.user.id)
         await interaction.response.send_message("Prediction canceled. All bets have been refunded.")
 
-    @bet.command(name="resolve", description="Market creator: name the winning choice and pay out.")
+    @bet.command(name="resolve", description="Market manager: name the winning choice and pay out.")
     @app_commands.describe(winner="The choice that won")
     async def resolve(self, interaction: discord.Interaction, winner: str):
         thread_id = self._thread_id(interaction)

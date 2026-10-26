@@ -1,0 +1,14 @@
+[
+  {
+    "bet": "{person} will leave the building before {time}",
+    "params": {"person": ["Andy", "Aidan"], "time": ["5pm", "midnight"]},
+    "bot_bet": [1, 3],
+    "admins": [728600387501686836]
+  },
+  {
+    "bet": "Who gets thrown in jail first {when}?",
+    "params": {"when": ["today", "this week"]},
+    "choices": ["aidan", "the_bot", "nobody"],
+    "admins": [728600387501686836]
+  }
+]

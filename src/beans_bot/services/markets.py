@@ -70,6 +70,25 @@ def parse_choices(content: str) -> list[str]:
     return choices
 
 
+def market_instructions(choices: list[str], manager_ids: list[int]) -> str:
+    """The how-to the bot posts in a new market thread."""
+    lines = ["Time to gamble!", "", "Place a bet with `/bet place`:"]
+    lines += [f"- `/bet place choice:{choice} amount:<coins>`" for choice in choices]
+    lines += [
+        "You may only choose one option.",
+        "However, if you want to lose more money you can use `/bet add` to increase your bet.",
+        "Changed your mind? `/bet swap` moves your whole bet, but it tells @everyone and sends you to jail.",
+        "If I'm the only loser and it resolves right away, I'll assume you cheated, and cheaters don't bet from jail.",
+        "Check the pool and odds: `/bet stats`",
+        "",
+        f"Commands for the prediction market manager{'s' if len(manager_ids) > 1 else ''}, {', '.join(f'<@{m}>' for m in manager_ids)}:",
+        "- Close betting and refund everyone: `/bet cancel`",
+        "- Close betting without naming a winner yet: `/bet close`",
+        "- Close betting and name a winner: `/bet resolve`",
+    ]
+    return "\n".join(lines)
+
+
 @dataclass
 class MarketStats:
     pool: int
@@ -177,8 +196,8 @@ class MarketService:
         return market
 
     def _require_creator(self, market: PredictionMarket, user_id: int) -> None:
-        if user_id != market.creator_id:
-            raise UserFacingError("Only the creator of the prediction can use this command.")
+        if user_id != market.creator_id and user_id not in market.admin_ids:
+            raise UserFacingError("Only the prediction's managers can use this command.")
 
     async def close(self, thread_id: int, user_id: int) -> None:
         async with self.db.transaction() as session:

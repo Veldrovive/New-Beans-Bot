@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from beans_bot.config.schema import BotConfig
 from beans_bot.currency import CurrencySystem
 from beans_bot.db.engine import Database
+from beans_bot.services.auto_bets import AutoBetService
 from beans_bot.services.coins import CoinService
 from beans_bot.services.council import CouncilService
 from beans_bot.services.gemini import GeminiService
@@ -25,6 +26,7 @@ class Services:
     coins: CoinService
     jail: JailService
     markets: MarketService
+    auto_bets: AutoBetService
     vip: VipService
     council: CouncilService
     snipes: SnipeService
@@ -45,6 +47,7 @@ class Services:
             coins=coins,
             jail=jail,
             markets=MarketService(db, coins, jail),
+            auto_bets=AutoBetService(db, currency),
             vip=vip,
             council=CouncilService(config),
             snipes=SnipeService(db),

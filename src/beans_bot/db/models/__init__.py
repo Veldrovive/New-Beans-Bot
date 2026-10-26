@@ -1,5 +1,6 @@
 """All tables. Importing this module registers every model on SQLModel.metadata."""
 
+from beans_bot.db.models.auto_bets import AutoBetPost
 from beans_bot.db.models.classifier import ClassifierProcessedMessage, ClassifierScriptLastUsed
 from beans_bot.db.models.coins import CoinAccount, CoinTransaction, CoinTransactionKind
 from beans_bot.db.models.daily_posts import ActionHolidayPost, BirthdayMessage, UsedHoliday, UsedOnThisDay
@@ -13,6 +14,7 @@ from beans_bot.db.models.vip import OnePercentTitle, VipDayPass
 
 __all__ = [
     "ActionHolidayPost",
+    "AutoBetPost",
     "BirthdayMessage",
     "ClassifierProcessedMessage",
     "ClassifierScriptLastUsed",

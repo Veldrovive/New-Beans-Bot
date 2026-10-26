@@ -92,6 +92,16 @@ guilds:
       - "The only loser here is me, and it took you no time at all? Cute. {members}: keep your stakes, I'm keeping my {amount}, and you're keeping a cell warm."
       - "{members} tried to rob the house of {amount} with a rigged market. Nobody gets paid. The fraudsters go to the stocks."
       - "The house has reviewed the tape. The only money on the table was mine. Everyone gets their own beans back, and {members} get jail."
+    # Bets the bot posts in the gambling forum by itself. The bets, and who manages each one, are in the JSON file.
+    auto_bets:
+      bets_file: auto_bets/prod.json
+      post_time: "09:00"  # In `timezone`
+      post_probability: 0.5
+      intro_scripts:  # {bet}
+      - "The house has a question, and it smells like money: {bet}"
+      - "I've been watching you all. Place your bets: {bet}"
+      - "Today's sure thing, according to nobody: {bet}"
+      - "Hear ye! The bookie is open. {bet}"
     birthday:
       birthdays_message_channel_id: 1435678059138121788
       birthdays_message_id: 1491511145511518318

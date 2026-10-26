@@ -122,6 +122,18 @@ class GamblingConfig(StrictModel):
     rigged_scripts: list[str] = []  # {members}, {amount}
 
 
+class AutoBetsConfig(StrictModel):
+    """
+    Bets the bot posts in the gambling forum by itself, picked from a JSON file of bet templates.
+    The file format is described in services/auto_bets.py.
+    """
+
+    bets_file: Path  # Relative to the working directory, like manifestos_dir
+    post_time: datetime.time = datetime.time(hour=9)  # In the bot's timezone
+    post_probability: float = 1.0  # Chance of posting on a given day
+    intro_scripts: list[str] = []  # {bet}. The start of the thread, above the choices.
+
+
 class BirthdayConfig(StrictModel):
     # The message that lists everyone's birthdays, one per line as "- Name: Month Day[, Year]".
     birthdays_message_channel_id: int
@@ -270,6 +282,7 @@ class GuildConfig(StrictModel):
     jail: JailConfig | None = None
     coins: CoinsConfig | None = None
     gambling: GamblingConfig | None = None
+    auto_bets: AutoBetsConfig | None = None
     birthday: BirthdayConfig | None = None
     action_holiday: ActionHolidayConfig | None = None
     fat_cow: FatCowConfig | None = None
@@ -284,6 +297,12 @@ class GuildConfig(StrictModel):
     def _snipes_need_a_council(self) -> GuildConfig:
         if self.snipes is not None and self.council_of_teds is None:
             raise ValueError("snipes needs a council_of_teds section to verify them")
+        return self
+
+    @model_validator(mode="after")
+    def _auto_bets_need_gambling(self) -> GuildConfig:
+        if self.auto_bets is not None and self.gambling is None:
+            raise ValueError("auto_bets needs a gambling section for its forum")
         return self
 
 
