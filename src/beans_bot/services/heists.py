@@ -185,6 +185,15 @@ class HeistService:
         logger.info(f"{user_id} joined heist {heist.id} on {heist.target_user_id} in guild {guild_id} (crew of {crew_size})")
         return heist, crew_size
 
+    async def current_heist(self, guild_id: int, user_id: int) -> tuple[Heist, int] | None:
+        """The active heist the member is in, and its crew size. None if they aren't in one."""
+        async with self.db.transaction() as session:
+            for heist in await self._active_heists(session, guild_id):
+                assert heist.id is not None
+                if await session.get(HeistMember, (heist.id, user_id)) is not None:
+                    return heist, len(await self._crew(session, heist.id))
+        return None
+
     async def crew(self, heist_id: int) -> list[int]:
         """The crew's user IDs, leader first."""
         async with self.db.transaction() as session:

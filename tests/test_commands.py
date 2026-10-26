@@ -36,7 +36,7 @@ async def test_commands_register(tmp_path: Path):
             "coins wealth", "coins leaderboard", "bet place", "bet add", "bet swap", "bet stats", "bet close", "bet cancel",
             "bet resolve", "admin botbet", "autobet post", "fatcow start", "fatcow consumed", "fatcow went", "fatcow leaderboard",
             "vip daypass", "vip henchman", "vip onepercent", "vip status", "manifesto wisdom", "manifesto list",
-            "manifesto add", "manifesto edit", "manifesto remove", "heist begin", "heist join", "heist snitch",
+            "manifesto add", "manifesto edit", "manifesto remove", "heist begin", "heist join", "heist snitch", "heist status",
         } <= names  # fmt: skip
         assert bot.tree.get_command("Impart wisdom", type=discord.AppCommandType.message) is not None
         for command in bot.tree.get_commands():

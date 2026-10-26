@@ -176,6 +176,36 @@ class HeistCog(BeansCog):
         text += f"\n-# The heist falls apart {discord.utils.format_dt(heist.ends_at, 'R')}."
         await interaction.response.send_message(text, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
 
+    @heist_group.command(name="status", description="Check on the heist you're in. Only you see the reply.")
+    @requires_feature("heists")
+    async def status(self, interaction: discord.Interaction):
+        assert interaction.guild is not None
+        config = self.heists_config(interaction.guild.id)
+        assert config is not None
+        current = await self.services.heists.current_heist(interaction.guild.id, interaction.user.id)
+        if current is None:
+            await interaction.response.send_message(
+                "You're not in a heist. You're just a law-abiding citizen. How boring.", ephemeral=True
+            )
+            return
+
+        heist, crew_size = current
+        role = "the leader" if heist.leader_user_id == interaction.user.id else "a robber"
+        percent = cut_percent(crew_size, config)
+        balance = await self.services.coins.balance(interaction.guild.id, heist.target_user_id)
+        loot = self.services.currency.format(percent_of(balance, percent, self.services.currency))
+        text = (
+            f"You're {role} in the heist on <@{heist.target_user_id}>. Codeword: **{heist.code}**. Keep your voice down.\n"
+            f"- Crew: {crew_size} {'robber' if crew_size == 1 else 'robbers'}, you included\n"
+        )
+        if crew_size < config.min_crew:
+            text += f"- Payday: nothing yet. The crew needs {config.min_crew - crew_size} more before a snipe pays.\n"
+        else:
+            text += f"- Payday: {percent}% of their coins, about {loot} right now, split evenly\n"
+        text += f"-# Only snipes posted since the heist began {discord.utils.format_dt(heist.started_at, 'R')} count. "
+        text += f"It falls apart {discord.utils.format_dt(heist.ends_at, 'R')}."
+        await interaction.response.send_message(text, ephemeral=True, allowed_mentions=discord.AllowedMentions.none())
+
     @heist_group.command(name="snitch", description="Turn in a heist crew. Everyone goes to jail, you included, for cover.")
     @requires_feature("heists")
     async def snitch(self, interaction: discord.Interaction, code: str):

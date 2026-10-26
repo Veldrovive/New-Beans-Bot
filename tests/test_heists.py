@@ -66,6 +66,20 @@ async def test_begin_and_join(heists):
     assert await heists.crew(heist.id) == [1, 2]
 
 
+async def test_current_heist_only_for_the_crew(heists):
+    heist = await heists.begin(GUILD, 1, TARGET, "badger", CONFIG)
+    await heists.join(GUILD, 2, "badger")
+    for user_id in (1, 2):
+        current = await heists.current_heist(GUILD, user_id)
+        assert current is not None and current[0].id == heist.id and current[1] == 2
+    assert await heists.current_heist(GUILD, TARGET) is None
+    assert await heists.current_heist(GUILD, 3) is None
+    assert await heists.current_heist(GUILD + 1, 1) is None
+
+    await heists.snitch(GUILD, 3, "badger", CONFIG)  # Over, so nobody is in it anymore
+    assert await heists.current_heist(GUILD, 1) is None
+
+
 async def test_rejections_change_nothing(heists, db):
     heist = await heists.begin(GUILD, 1, TARGET, "badger", CONFIG)
     with pytest.raises(CantRobYourself):
