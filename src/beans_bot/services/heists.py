@@ -25,6 +25,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from beans_bot.config.schema import HeistConfig
+from beans_bot.currency import CurrencySystem
 from beans_bot.db.engine import Database
 from beans_bot.db.models import CoinTransactionKind, Heist, HeistMember, Snipe
 from beans_bot.db.types import utcnow
@@ -81,9 +82,12 @@ def cut_percent(crew_size: int, config: HeistConfig) -> int:
     return config.cuts[max(sizes)] if sizes else 0
 
 
-def percent_of(balance: int, percent: int) -> int:
-    """`percent` of a balance, rounded down. Nothing comes out of an empty or overdrawn balance."""
-    return balance * percent // 100 if balance > 0 else 0
+def percent_of(balance: int, percent: int, currency: CurrencySystem) -> int:
+    """
+    `percent` of a balance, rounded down to the smallest coin (a CheddarCoin, when it's on).
+    Nothing comes out of an empty or overdrawn balance.
+    """
+    return currency.floor(balance * percent // 100) if balance > 0 else 0
 
 
 class HeistService:
@@ -211,8 +215,11 @@ class HeistService:
             if snipe is None or snipe.verified_at is None:
                 return None
             robbers = [m for m in crew if m.joined_at <= snipe.verified_at]
-            loot = percent_of(await self.coins.balance_in(session, heist.guild_id, heist.target_user_id), cut_percent(len(robbers), config))
-            each, remainder = divmod(loot, len(robbers))
+            target_balance = await self.coins.balance_in(session, heist.guild_id, heist.target_user_id)
+            loot = percent_of(target_balance, cut_percent(len(robbers), config), self.coins.currency)
+            # Split in whole coins. The leader keeps the coins that don't divide evenly.
+            coin = self.coins.currency.granularity
+            each, remainder = (n * coin for n in divmod(loot // coin, len(robbers)))
             shares = {}
             for member in robbers:
                 share = each + (remainder if member.user_id == heist.leader_user_id else 0)
@@ -259,7 +266,7 @@ class HeistService:
             crew = {m.user_id: m for m in await self._crew(session, heist.id)}
             fines = {}
             for user_id in [*crew, *([] if snitch_id in crew else [snitch_id])]:
-                fine = percent_of(await self.coins.balance_in(session, guild_id, user_id), config.snitch_fine_percent)
+                fine = percent_of(await self.coins.balance_in(session, guild_id, user_id), config.snitch_fine_percent, self.coins.currency)
                 if fine > 0:
                     await self.coins.move(
                         session,
@@ -275,7 +282,7 @@ class HeistService:
                 fines[user_id] = fine
             heist.snitched_at = utcnow()
             heist.snitch_user_id = snitch_id
-            heist.snitch_reward = percent_of(sum(fines.values()), config.snitch_reward_percent)
+            heist.snitch_reward = percent_of(sum(fines.values()), config.snitch_reward_percent, self.coins.currency)
             session.add(heist)
         logger.info(
             f"{snitch_id} snitched on heist {heist.id} in guild {guild_id}: fined {sum(fines.values())} from {sorted(fines)}, "

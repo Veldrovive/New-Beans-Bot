@@ -5,8 +5,10 @@ import pytest
 from sqlmodel import select
 
 from beans_bot.config.schema import HeistConfig, OnePercentConfig
+from beans_bot.currency import CurrencySystem
 from beans_bot.db.models import CoinTransactionKind, Heist, HeistMember, OnePercentTitle
 from beans_bot.db.types import utcnow
+from beans_bot.services.coins import CoinService
 from beans_bot.services.heists import AlreadyInHeist, CantRobYourself, CodewordTaken, NoSuchHeist, TargetAlreadyHeisted, cut_percent
 
 from conftest import GUILD, HOUSE
@@ -17,6 +19,14 @@ TARGET = 50
 CREW = [1, 2, 3, 4]
 COUNCIL = 77
 _message_ids = itertools.count(1000)
+
+
+@pytest.fixture
+def coins(db):
+    """Cheddar on, so amounts round to 10 base units."""
+    service = CoinService(db, CurrencySystem(cheddar_enabled=True))
+    service.house_user_id = HOUSE
+    return service
 
 
 async def fund(coins, user_id, beans):
@@ -101,12 +111,23 @@ async def test_success_splits_loot_evenly(heists, snipes, coins):
 
 
 async def test_leader_keeps_the_change(heists, snipes, coins):
-    await fund(coins, TARGET, 1)  # 10% of 100 is 10: 2 each, and the leader gets 2 more
+    await fund(coins, TARGET, 10)  # 10% of 1,000 is 10 cheddar: 2 each, and the leader gets the 2 left over
     await plot(heists)
     await snipe(snipes, sniper=2)
     [success] = await heists.resolve_snipes(GUILD, CONFIG)
-    assert success.shares == {1: 4, 2: 2, 3: 2, 4: 2}
-    assert await coins.balance(GUILD, TARGET) == 90
+    assert success.shares == {1: 40, 2: 20, 3: 20, 4: 20}
+    assert await coins.balance(GUILD, TARGET) == 900
+
+
+async def test_loot_rounds_down_to_a_cheddar(heists, snipes, coins):
+    async with coins.db.transaction() as session:
+        await coins.move(session, guild_id=GUILD, amount=1290, kind=CoinTransactionKind.REACTION, to_user_id=TARGET)
+    await plot(heists)
+    await snipe(snipes, sniper=1)
+    [success] = await heists.resolve_snipes(GUILD, CONFIG)
+    assert success.heist.loot == 120  # 10% of 1,290 is 129, rounded down to 12 cheddar
+    assert success.shares == {1: 30, 2: 30, 3: 30, 4: 30}
+    assert await coins.balance(GUILD, TARGET) == 1170
 
 
 async def test_snipes_that_dont_count(heists, snipes, coins):
@@ -184,6 +205,19 @@ async def test_crew_snitch_is_fined_once(heists, coins):
     result = await heists.snitch(GUILD, 2, "badger", CONFIG)
     assert result.fines == {1: 0, 2: 100, 3: 0, 4: 0}
     assert await coins.balance(GUILD, 2) == 300
+
+
+async def test_fines_and_reward_round_down_to_a_cheddar(heists, coins):
+    for user_id in CREW[:3]:
+        async with coins.db.transaction() as session:
+            await coins.move(session, guild_id=GUILD, amount=130, kind=CoinTransactionKind.REACTION, to_user_id=user_id)
+    heist = await plot(heists)
+    result = await heists.snitch(GUILD, 4, "badger", NOW)
+    assert result.fines == {1: 30, 2: 30, 3: 30, 4: 0}  # 25% of 130 is 32.5, rounded down to 3 cheddar
+    assert result.heist.snitch_reward == 40  # Half of 90 is 45, rounded down to 4 cheddar
+    assert heist.id is not None
+    assert await heists.pay_reward(heist.id, NOW.snitch_reward_delay) == 40
+    assert await coins.balance(GUILD, HOUSE) == 50
 
 
 async def test_snitch_reward_waits_then_pays_once(heists, coins):

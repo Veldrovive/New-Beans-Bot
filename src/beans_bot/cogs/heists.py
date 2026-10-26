@@ -101,7 +101,7 @@ class HeistCog(BeansCog):
         for size in range(config.min_crew, max(biggest, config.min_crew) + 1):
             percent = cut_percent(size, config)
             more = "+" if size == biggest else ""
-            lines.append(f"- **{size}{more}** robbers: {percent}%, about {self.services.currency.format(percent_of(balance, percent))}")
+            lines.append(f"- **{size}{more}** robbers: {percent}%, about {self.services.currency.format(percent_of(balance, percent, self.services.currency))}")
         return "\n".join(lines)
 
     # --- Commands -----------------------------------------------------------------------
