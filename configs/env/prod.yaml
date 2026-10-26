@@ -373,11 +373,11 @@ guilds:
     heists:
       min_crew: 4  # The leader counts
       cuts:  # Crew size -> percent of the target's coins stolen. Bigger crews get the biggest size listed.
-        4: 30
-        5: 45
-        6: 55
-        7: 70
-        8: 100
+        4: 50
+        5: 55
+        6: 65
+        7: 75
+        8: 90
       duration: P3D
       snitch_fine_percent: 25
       snitch_reward_percent: 50
@@ -390,9 +390,8 @@ guilds:
       - "{leader}, you magnificent criminal. The codeword for robbing {target} is {code}. Eat this message after reading."
       - "So it begins. {target}'s coins don't know it yet, but they're yours. Codeword: {code}."
       success_scripts:  # {target}, {crew}, {sniper}, {loot}
-      - "Heist complete! {sniper} caught {target} in the act, and {crew} made off with {loot}."
-      - "{target} has been robbed blind. {crew} split {loot}, thanks to {sniper}'s camera work."
-      - "Ocean's Eleven, but worse. {crew} just lifted {loot} off {target}. Shot by {sniper}."
+      - "{target} has been robbed blind. The loot has been split, thanks to {sniper}'s camera work."
+      - "Ocean's Eleven, but worse. The crew just lifted {loot} off {target}. Shot by {sniper}."
       dethroned_scripts:  # {target}. When the target was the 1%.
       - "{target} has been knocked off the 1%. Back to the proletariat with you. The title is up for grabs at the starting price."
       - "The penthouse is empty. {target} is no longer the 1%, and the price has been reset for the next sucker."
