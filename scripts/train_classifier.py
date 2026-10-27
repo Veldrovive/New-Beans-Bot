@@ -5,6 +5,7 @@ Train and test a classifier for every dataset in the datasets directory.
 
 Folder layout:
     <models-dir>/datasets/<dataset_name>/{train,test}/<label>/<image>
+Images whose names start with "_" or "." are skipped (Finder litters folders with .DS_Store).
 
 Embeddings are cached by file hash in <models-dir>/cache/embeddings.pkl, so
 retraining only embeds new images. Each dataset produces <models-dir>/<dataset_name>.pkl
@@ -63,12 +64,12 @@ def annotate_image(image_path: Path, probs: np.ndarray, labels: list[str], outpu
     cv2.imwrite(str(output_dir / f"{image_path.stem}_annotated.png"), img)
 
 
-def load_split(split_dir: Path, labels: list[str], extractor, cache, skip_hidden: bool):
+def load_split(split_dir: Path, labels: list[str], extractor, cache):
     X, y, paths = [], [], []
     for index, label in enumerate(labels):
         print(f"Extracting embeddings for {split_dir.name}/{label}...")
         for path in tqdm.tqdm(sorted((split_dir / label).iterdir())):
-            if not path.is_file() or (skip_hidden and path.stem[0] in "_."):
+            if not path.is_file() or path.name[0] in "_.":
                 continue
             X.append(embed(path, extractor, cache).squeeze())
             y.append(index)
@@ -91,7 +92,7 @@ def main() -> None:
     for dataset in sorted(p for p in datasets_dir.iterdir() if p.is_dir()):
         labels = sorted(p.name for p in (dataset / "train").iterdir() if p.is_dir())
         print(f"\n--- Training {dataset.name} ({len(labels)} labels: {', '.join(labels)}) ---")
-        X_train, y_train, _ = load_split(dataset / "train", labels, extractor, cache, skip_hidden=True)
+        X_train, y_train, _ = load_split(dataset / "train", labels, extractor, cache)
         cache_file.write_bytes(pickle.dumps(cache))
 
         classifier = Classifier()
@@ -100,7 +101,7 @@ def main() -> None:
 
         print(f"\n--- Testing {dataset.name} ---")
         output_dir = dataset / "test_output"
-        X_test, y_test, test_paths = load_split(dataset / "test", labels, extractor, cache, skip_hidden=False)
+        X_test, y_test, test_paths = load_split(dataset / "test", labels, extractor, cache)
         cache_file.write_bytes(pickle.dumps(cache))
         probs = classifier.predict_proba(X_test)
         for path, label_index, image_probs in zip(test_paths, y_test, probs):
