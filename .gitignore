@@ -19,6 +19,7 @@ outputs/
 docker-compose.yml
 models/classifier/cache/
 models/classifier/datasets/
+models/classifier/test_output/
 
 # Claude Code worktrees
 .claude/worktrees/
