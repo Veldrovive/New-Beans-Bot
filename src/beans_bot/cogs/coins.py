@@ -1,4 +1,13 @@
-"""BeanCoins: earned when others react to your messages with the coin emoji."""
+"""
+BeanCoins: earned when others react to your messages with the coin emoji.
+
+- /coins wealth shows a balance. Checking yourself quietly also shows your ShadowBean Coins,
+  which nobody else ever sees.
+- /coins launder turns ShadowBeans into regular coins. Only you see the reply. Do it a bit at a
+  time if you'd rather nobody noticed your balance jump.
+- /coins transfer gives another member some of your coins. A quiet transfer is DMed to the
+  recipient instead of announced, and always says who sent it.
+"""
 
 import datetime
 
@@ -6,8 +15,9 @@ import discord
 from discord import app_commands
 
 from beans_bot.cogs.base import QUIET_HELP, BeansCog, in_bot_channel, requires_feature
-from beans_bot.services import emoji
-from beans_bot.services.coins import ReactionGrantResult
+from beans_bot.services import emoji, scripts
+from beans_bot.services.coins import CantPayYourself, InsufficientFunds, NothingToLaunder, ReactionGrantResult
+from beans_bot.services.errors import UserFacingError
 
 
 class CoinsCog(BeansCog):
@@ -56,14 +66,70 @@ class CoinsCog(BeansCog):
         currency = self.services.currency
         balance = await self.services.coins.balance(interaction.guild_id, target.id)
         received, gifted = await self.services.coins.reaction_totals(interaction.guild_id, target.id)
-        await interaction.response.send_message(
-            f"**Current wealth for {target.display_name}**\n"
-            f"- Balance: {currency.format(balance)}\n\n"
-            f"**Overall**\n"
-            f"- Total Received: {currency.format(received)}\n"
-            f"- Total Gifted to others: {currency.format(gifted)}",
-            ephemeral=quiet,
-        )
+        text = f"**Current wealth for {target.display_name}**\n- Balance: {currency.format(balance)}\n"
+        # ShadowBeans only show to their owner, and only when nobody else can see the reply.
+        if quiet and target.id == interaction.user.id:
+            shadow = await self.services.coins.shadow_balance(interaction.guild_id, target.id)
+            text += f"- ShadowBean Coins: {currency.format(shadow)}\n-# Only you can see these. `/coins launder` brings them into the light.\n"
+        text += f"\n**Overall**\n- Total Received: {currency.format(received)}\n- Total Gifted to others: {currency.format(gifted)}"
+        await interaction.response.send_message(text, ephemeral=quiet)
+
+    @coins_group.command(name="launder", description="Turn your ShadowBean Coins into regular coins. Only you see the reply.")
+    @app_commands.describe(amount='How many ShadowBeans to launder, like "5" or "3 cheddar", or "all"')
+    @requires_feature("coins")
+    async def launder(self, interaction: discord.Interaction, amount: str):
+        assert interaction.guild_id is not None
+        config = self.guild_config(interaction.guild_id)
+        assert config is not None and config.coins is not None
+        currency = self.services.currency
+        try:
+            laundered, left = await self.services.coins.launder(interaction.guild_id, interaction.user.id, currency.parse_bet(amount))
+        except NothingToLaunder:
+            raise UserFacingError("Your shadow pocket is empty. Go snitch on someone, or rob them. Then we'll talk.")
+        except InsufficientFunds as e:
+            raise UserFacingError(
+                f"You want to launder {currency.format(e.needed)}, but you only have {currency.format(e.balance)} in ShadowBeans. "
+                "Even the mob can't clean money you don't have."
+            )
+        values = {"amount": currency.format(laundered), "shadow_left": currency.format(left)}
+        text = scripts.pick(config.coins.launder_scripts, **values)
+        text = text or f"Washed and pressed. {values['amount']} is in your wallet now, and {values['shadow_left']} is still in the shadows."
+        text += "\n-# Your balance just went up. Try not to look so pleased about it."
+        await interaction.response.send_message(text, ephemeral=True)
+
+    @coins_group.command(name="transfer", description="Give another member some of your BeanCoins.")
+    @app_commands.describe(
+        member="Who gets the coins", amount='How much, like "5" or "3 cheddar"', quiet="Don't announce it. They still get a DM saying it was you."
+    )
+    @requires_feature("coins")
+    @in_bot_channel()
+    async def transfer(self, interaction: discord.Interaction, member: discord.Member, amount: str, quiet: bool = False):
+        assert interaction.guild_id is not None
+        config = self.guild_config(interaction.guild_id)
+        assert config is not None and config.coins is not None
+        currency = self.services.currency
+        coins = currency.parse(amount)
+        if member.bot:
+            raise UserFacingError("Bots don't take tips. If you want to give me money, lose a bet like everyone else.")
+        try:
+            await self.services.coins.transfer(interaction.guild_id, interaction.user.id, member.id, coins)
+        except CantPayYourself:
+            raise UserFacingError("Moving money from your left pocket to your right pocket isn't a transfer. It's fidgeting.")
+        except InsufficientFunds as e:
+            raise UserFacingError(f"You tried to send {currency.format(coins)} but only have {currency.format(e.balance)}. Generous of you, in theory.")
+
+        values = {"sender": interaction.user.mention, "recipient": member.mention, "amount": currency.format(coins)}
+        if not quiet:
+            text = scripts.pick(config.coins.transfer_scripts, **values)
+            text = text or f"{values['sender']} just handed {values['recipient']} {values['amount']}. No strings attached. Probably."
+            await interaction.response.send_message(text, allowed_mentions=discord.AllowedMentions(users=[member]))
+            return
+        await interaction.response.send_message(f"Done. {values['amount']} slipped to {member.mention}. They'll know it was you.", ephemeral=True)
+        text = scripts.pick(config.coins.transfer_quiet_scripts, sender=values["sender"], amount=values["amount"])
+        try:
+            await member.send(text or f"{values['sender']} slipped you {values['amount']} under the table. Act natural.")
+        except discord.HTTPException:
+            self.logger.info(f"Could not DM {member.id} about a quiet transfer from {interaction.user.id}")
 
     @coins_group.command(name="leaderboard", description="Show who has the most BeanCoins.")
     @app_commands.describe(quiet=QUIET_HELP)

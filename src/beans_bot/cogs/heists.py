@@ -5,11 +5,13 @@ Heists: rob a member by sniping them, with a crew recruited in real life.
   much each crew size would steal. The leader shares the codeword out loud, not in Discord.
 - /heist join puts you in the crew. /heist snitch turns the crew in. Both take the codeword
   and only you see the reply.
-- When the snipes cog verifies a snipe it tells us, and the crew's payday is announced as a
-  reply to the photo. A loop also catches any we missed, expires old heists (the crew gets a
-  DM) and pays snitches once their delay is up (by DM, so nobody sees it).
+- When the snipes cog verifies a snipe it tells us, and the payday is announced as a reply to
+  the photo. It names the target and the sniper, never the rest of the crew, and the loot is
+  paid in ShadowBeans so balances don't give them away either. A loop also catches any we
+  missed and expires old heists (the crew gets a DM).
 - Snitching jails the crew and the snitch alike. The announcement lists everyone jailed in a
-  random order, so the snitch can't be picked out.
+  random order, so the snitch can't be picked out. The snitch's reward goes straight into
+  their shadow pocket.
 """
 
 from __future__ import annotations
@@ -226,10 +228,11 @@ class HeistCog(BeansCog):
 
         own_fine = self.services.currency.format(result.fines[interaction.user.id])
         reward = self.services.currency.format(result.heist.snitch_reward or 0)
-        payday = discord.utils.format_dt(discord.utils.utcnow() + config.snitch_reward_delay, "R")
+        payment = scripts.pick(config.snitch_reward_scripts, reward=reward)
+        payment = payment or f"A plain envelope with {reward} in ShadowBeans is already in your pocket. We never spoke."
         await interaction.followup.send(
             f"Your secret is safe with me. Mostly. You're off to jail with the rest of them and paid {own_fine}, "
-            f"so nobody suspects a thing.\n-# Your cut of {reward} arrives quietly {payday}.",
+            f"so nobody suspects a thing.\n{payment}\n-# Only you can see ShadowBeans. `/coins launder` turns them into real coins.",
             ephemeral=True,
         )
 
@@ -279,20 +282,20 @@ class HeistCog(BeansCog):
     async def announce_success(self, guild: discord.Guild, config: HeistConfig, success: HeistSuccess) -> None:
         heist = success.heist
         robbers = list(success.shares)
+        # Only the target and the sniper are named. The rest of the crew stays anonymous.
         values = {
             "target": f"<@{heist.target_user_id}>",
-            "crew": scripts.join_names([f"<@{u}>" for u in robbers]),
             "sniper": f"<@{success.sniper_user_id}>",
             "loot": self.services.currency.format(heist.loot or 0),
         }
         text = scripts.pick(config.success_scripts, **values)
-        text = text or f"Heist complete! {values['crew']} robbed {values['target']} blind and made off with {values['loot']}."
+        text = text or f"Heist complete! {values['sniper']} caught {values['target']} on camera, and a crew made off with {values['loot']}."
         if success.dethroned:
             dethroned = scripts.pick(config.dethroned_scripts, target=values["target"])
             text += "\n" + (dethroned or f"{values['target']} has lost the 1%. The penthouse is back on the market at the starting price.")
         each = self.services.currency.format(min(success.shares.values()))
         text += f"\n-# {len(robbers)} robbers, {each} each, and the leader keeps the change."
-        mentions = discord.AllowedMentions(users=[discord.Object(u) for u in [heist.target_user_id, *robbers]], replied_user=False)
+        mentions = discord.AllowedMentions(users=[discord.Object(heist.target_user_id), discord.Object(success.sniper_user_id)], replied_user=False)
 
         snipes_config = self.guild_config(guild.id)
         photo = None
@@ -316,7 +319,7 @@ class HeistCog(BeansCog):
                 continue
             await self.resolve(guild.id)  # In case we missed a verification
             await self.expire(guild.id, config)
-            await self.pay_snitches(guild.id, config)
+            await self.pay_snitches(guild.id)
 
     @check_heists.before_loop
     async def before_check_heists(self):
@@ -330,12 +333,12 @@ class HeistCog(BeansCog):
             for user_id in await self.services.heists.crew(heist.id):
                 await self.dm(user_id, text)
 
-    async def pay_snitches(self, guild_id: int, config: HeistConfig) -> None:
-        for heist in await self.services.heists.due_rewards(guild_id, config.snitch_reward_delay):
+    async def pay_snitches(self, guild_id: int) -> None:
+        """Pay snitches still owed from before rewards were paid on the spot."""
+        for heist in await self.services.heists.unpaid_rewards(guild_id):
             assert heist.id is not None and heist.snitch_user_id is not None
-            reward = await self.services.heists.pay_reward(heist.id, config.snitch_reward_delay)
+            reward = await self.services.heists.pay_reward(heist.id)
             if not reward:
                 continue
             amount = self.services.currency.format(reward)
-            text = scripts.pick(config.snitch_reward_scripts, reward=amount)
-            await self.dm(heist.snitch_user_id, text or f"A plain envelope with {amount} inside. For services rendered. We never spoke.")
+            await self.dm(heist.snitch_user_id, f"The house settles its debts. {amount} in ShadowBeans for an old favor. `/coins launder` cleans them up.")

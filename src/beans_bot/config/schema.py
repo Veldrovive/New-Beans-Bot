@@ -102,6 +102,9 @@ class CoinsConfig(StrictModel):
     reaction_value: CoinAmount = parse_amount(1)
     max_reactions_per_day: int
     max_message_age: datetime.timedelta = datetime.timedelta(days=3)
+    transfer_scripts: list[str] = []  # {sender}, {recipient}, {amount}. Posted for a public transfer.
+    transfer_quiet_scripts: list[str] = []  # {sender}, {amount}. DMed to the recipient of a quiet transfer.
+    launder_scripts: list[str] = []  # {amount}, {shadow_left}. Private reply to the launderer.
 
 
 class BotBettingConfig(StrictModel):
@@ -271,14 +274,13 @@ class HeistConfig(StrictModel):
     cuts: dict[int, int] = {4: 10, 5: 15, 6: 20, 7: 25, 8: 30}
     duration: datetime.timedelta = datetime.timedelta(days=3)  # Hydra/YAML: seconds, or ISO 8601
     snitch_fine_percent: int = 25  # Of each crew member's (and the snitch's) balance, paid to the house
-    snitch_reward_percent: int = 50  # Of all the fines, paid by the house to the snitch after the delay
-    snitch_reward_delay: datetime.timedelta = datetime.timedelta(days=1)  # So the payout doesn't give them away
+    snitch_reward_percent: int = 50  # Of all the fines, paid by the house into the snitch's shadow pocket
     fallback_codewords: list[str] = []  # Used when the random noun API is down
     begin_scripts: list[str] = []  # {leader}, {target}, {code}. Private; the cut table is added after.
-    success_scripts: list[str] = []  # {target}, {crew}, {sniper}, {loot}
+    success_scripts: list[str] = []  # {target}, {sniper}, {loot}. Never names the rest of the crew.
     dethroned_scripts: list[str] = []  # {target}. Added when the target was the 1%.
     snitched_scripts: list[str] = []  # {target}, {crew}, {fined}
-    snitch_reward_scripts: list[str] = []  # {reward}. Sent to the snitch by DM.
+    snitch_reward_scripts: list[str] = []  # {reward}. Added to the snitch's private reply.
     expired_scripts: list[str] = []  # {target}. Sent to the crew by DM.
 
     @model_validator(mode="after")

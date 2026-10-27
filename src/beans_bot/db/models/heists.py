@@ -28,7 +28,7 @@ class Heist(SQLModel, table=True):
     # Somebody used the codeword to turn the crew in
     snitched_at: datetime.datetime | None = Field(default=None, sa_type=UTCDateTime)
     snitch_user_id: int | None = None
-    snitch_reward: int | None = None  # Paid by the house once the delay has passed
+    snitch_reward: int | None = None  # Paid by the house into the snitch's shadow pocket
     reward_paid_at: datetime.datetime | None = Field(default=None, sa_type=UTCDateTime)
     expired_at: datetime.datetime | None = Field(default=None, sa_type=UTCDateTime)
 

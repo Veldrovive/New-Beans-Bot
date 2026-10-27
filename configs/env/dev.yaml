@@ -59,6 +59,18 @@ guilds:
       emoji: BeanCoin
       reaction_value: 1
       max_reactions_per_day: 2
+      transfer_scripts:  # {sender}, {recipient}, {amount}
+      - "{sender} just handed {recipient} {amount}. No strings attached. Probably."
+      - "Charity! {sender} gave {recipient} {amount}. The house would like to remind everyone it also accepts donations."
+      - "{recipient}, {sender} sent you {amount}. Whatever you did for it, we don't want to know."
+      transfer_quiet_scripts:  # {sender}, {amount}. DMed to the recipient.
+      - "{sender} slipped you {amount} under the table. Act natural."
+      - "A discreet {amount}, courtesy of {sender}. Nobody else knows. Keep it that way."
+      - "{sender} sent you {amount} on the quiet. Spend it like you earned it."
+      launder_scripts:  # {amount}, {shadow_left}
+      - "Washed, rinsed and pressed. {amount} is in your wallet now, and {shadow_left} is still in the shadows."
+      - "{amount} has been laundered. If anyone asks, you found it in a coat. {shadow_left} left in the shadows."
+      - "Clean as a whistle. {amount} is now perfectly legitimate money. {shadow_left} is still waiting its turn."
     gambling:
       forum_channel_id: 1524210156387438703
       bot_betting:
@@ -347,7 +359,6 @@ guilds:
       duration: P3D
       snitch_fine_percent: 25
       snitch_reward_percent: 50
-      snitch_reward_delay: P1D
       fallback_codewords: [aardvark, anvil, badger, banjo, biscuit, cabbage, cactus, chandelier, crowbar, dumpling, eel,
         ferret, gazebo, goose, harmonica, igloo, jellyfish, kettle, lobster, marmalade, moose, noodle, octopus, pickle,
         pigeon, pretzel, quokka, sardine, teapot, trombone, walrus, yak]
@@ -355,10 +366,10 @@ guilds:
       - "The heist on {target} is on, {leader}. Your codeword is {code}. Whisper it. Never type it."
       - "{leader}, you magnificent criminal. The codeword for robbing {target} is {code}. Eat this message after reading."
       - "So it begins. {target}'s coins don't know it yet, but they're yours. Codeword: {code}."
-      success_scripts:  # {target}, {crew}, {sniper}, {loot}
-      - "Heist complete! {sniper} caught {target} in the act, and {crew} made off with {loot}."
-      - "{target} has been robbed blind. {crew} split {loot}, thanks to {sniper}'s camera work."
-      - "Ocean's Eleven, but worse. {crew} just lifted {loot} off {target}. Shot by {sniper}."
+      success_scripts:  # {target}, {sniper}, {loot}. Never names the rest of the crew.
+      - "Heist complete! {sniper} caught {target} in the act, and a crew of nobodies made off with {loot}."
+      - "{target} has been robbed blind. The loot has been split, thanks to {sniper}'s camera work."
+      - "Ocean's Eleven, but worse. The crew just lifted {loot} off {target}. Shot by {sniper}."
       dethroned_scripts:  # {target}. When the target was the 1%.
       - "{target} has been knocked off the 1%. Back to the proletariat with you. The title is up for grabs at the starting price."
       - "The penthouse is empty. {target} is no longer the 1%, and the price has been reset for the next sucker."
@@ -366,10 +377,10 @@ guilds:
       - "A little bird sang. The heist on {target} is busted, and {crew} are off to jail. The house keeps {fined}."
       - "Somebody talked. {crew} are going to the stocks for plotting against {target}. The house thanks you for {fined}."
       - "Raid! The feds kicked in the door on {crew}. {target}'s coins are safe, and the house pockets {fined} in fines."
-      snitch_reward_scripts:  # {reward}. Sent to the snitch by DM.
-      - "A plain envelope with {reward} inside. For services rendered. We never spoke."
-      - "Here's {reward}. Snitches get stitches, but they also get paid."
-      - "The house remembers its friends. {reward}, deposited. Burn this message."
+      snitch_reward_scripts:  # {reward}. Added to the snitch's private reply.
+      - "A plain envelope with {reward} in ShadowBeans is already in your pocket. For services rendered. We never spoke."
+      - "Here's {reward} in ShadowBeans. Snitches get stitches, but they also get paid."
+      - "The house remembers its friends. {reward} in ShadowBeans, deposited where nobody can see. Burn this message."
       expired_scripts:  # {target}. Sent to the crew by DM.
       - "The heist on {target} fell apart. Nobody got sniped, nobody got paid, nobody got caught. Pathetic."
       - "Three days and not one photo of {target}. The heist is off. Maybe crime isn't for you."

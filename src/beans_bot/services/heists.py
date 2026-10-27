@@ -5,10 +5,11 @@ Heists: a crew robs a member by sniping them.
   Anyone with the codeword can join. The leader counts toward the crew.
 - If a crew member's snipe of the target (posted after the heist began) is verified while the
   crew has at least `min_crew` people, the heist succeeds. The crew splits a cut of the target's
-  balance evenly, and a target who held the 1% loses it.
+  balance evenly, paid in ShadowBeans so nobody can spot the robbers by their balances, and a
+  target who held the 1% loses it.
 - Anyone with the codeword can snitch instead. Everyone in the crew, and the snitch too so
-  nobody can tell who it was, pays a fine to the house and goes to jail. Once the delay has
-  passed, the house quietly pays the snitch a share of all the fines.
+  nobody can tell who it was, pays a fine to the house and goes to jail. The house pays the
+  snitch a share of all the fines in ShadowBeans on the spot, where nobody can see it.
 - A heist that hasn't succeeded within its duration expires, and nothing happens to anyone.
 
 Snipes are judged by the council as usual. Being in a crew doesn't stop a council member from
@@ -17,7 +18,6 @@ verifying the snipe.
 
 from __future__ import annotations
 
-import datetime
 import logging
 from dataclasses import dataclass
 
@@ -237,10 +237,11 @@ class HeistService:
                         session,
                         guild_id=heist.guild_id,
                         amount=share,
-                        kind=CoinTransactionKind.HEIST_LOOT,
+                        kind=CoinTransactionKind.HEIST_SHADOW_LOOT,
                         from_user_id=heist.target_user_id,
                         to_user_id=member.user_id,
                         message_id=snipe.message_id,
+                        to_shadow=True,
                     )
                 member.share = share
                 session.add(member)
@@ -265,7 +266,8 @@ class HeistService:
     async def snitch(self, guild_id: int, snitch_id: int, code: str, config: HeistConfig) -> HeistSnitch:
         """
         Turn in the heist with this codeword. The crew and the snitch each pay the house a fine, and the
-        snitch's reward is set aside for later. The caller jails everyone in the result. Raises NoSuchHeist.
+        house pays the snitch's reward into their shadow pocket. The caller jails everyone in the result.
+        Raises NoSuchHeist.
         """
         async with self.db.transaction() as session:
             heist = await self._active_by_code(session, guild_id, code)
@@ -292,46 +294,47 @@ class HeistService:
             heist.snitched_at = utcnow()
             heist.snitch_user_id = snitch_id
             heist.snitch_reward = percent_of(sum(fines.values()), config.snitch_reward_percent, self.coins.currency)
-            session.add(heist)
+            await self._pay_reward(session, heist)
         logger.info(
             f"{snitch_id} snitched on heist {heist.id} in guild {guild_id}: fined {sum(fines.values())} from {sorted(fines)}, "
-            f"reward {heist.snitch_reward} due later"
+            f"rewarded {heist.snitch_reward} in ShadowBeans"
         )
         return HeistSnitch(heist=heist, fines=fines)
 
-    async def due_rewards(self, guild_id: int, delay: datetime.timedelta) -> list[Heist]:
-        """Snitched heists whose snitch is owed their reward now."""
+    async def _pay_reward(self, session: AsyncSession, heist: Heist) -> int:
+        """Pay the snitch their reward from the house, into their shadow pocket, and mark it paid."""
+        assert heist.snitch_user_id is not None
+        reward = heist.snitch_reward or 0
+        if reward > 0:
+            await self.coins.move(
+                session,
+                guild_id=heist.guild_id,
+                amount=reward,
+                kind=CoinTransactionKind.SNITCH_SHADOW_REWARD,
+                from_user_id=self.coins.house_user_id,
+                to_user_id=heist.snitch_user_id,
+                to_shadow=True,
+            )
+        heist.reward_paid_at = utcnow()
+        session.add(heist)
+        return reward
+
+    async def unpaid_rewards(self, guild_id: int) -> list[Heist]:
+        """Snitched heists whose snitch was never paid. Only heists from before rewards were paid on the spot."""
         async with self.db.transaction() as session:
             result = await session.exec(
-                select(Heist).where(
-                    Heist.guild_id == guild_id,
-                    col(Heist.snitched_at).is_not(None),
-                    col(Heist.snitched_at) <= utcnow() - delay,
-                    col(Heist.reward_paid_at).is_(None),
-                )
+                select(Heist).where(Heist.guild_id == guild_id, col(Heist.snitched_at).is_not(None), col(Heist.reward_paid_at).is_(None))
             )
             return list(result.all())
 
-    async def pay_reward(self, heist_id: int, delay: datetime.timedelta) -> int | None:
-        """Pay the snitch their reward from the house. Returns the amount, or None if it isn't owed (yet, or anymore)."""
+    async def pay_reward(self, heist_id: int) -> int | None:
+        """Pay a snitch a reward they're still owed. Returns the amount, or None if it isn't owed anymore."""
         async with self.db.transaction() as session:
             heist = await session.get(Heist, heist_id)
-            if heist is None or heist.snitched_at is None or heist.reward_paid_at is not None or heist.snitched_at > utcnow() - delay:
+            if heist is None or heist.snitched_at is None or heist.reward_paid_at is not None:
                 return None
-            assert heist.snitch_user_id is not None
-            reward = heist.snitch_reward or 0
-            if reward > 0:
-                await self.coins.move(
-                    session,
-                    guild_id=heist.guild_id,
-                    amount=reward,
-                    kind=CoinTransactionKind.HEIST_SNITCH_REWARD,
-                    from_user_id=self.coins.house_user_id,
-                    to_user_id=heist.snitch_user_id,
-                )
-            heist.reward_paid_at = utcnow()
-            session.add(heist)
-        logger.info(f"Paid {heist.snitch_user_id} {reward} for snitching on heist {heist_id} in guild {heist.guild_id}")
+            reward = await self._pay_reward(session, heist)
+        logger.info(f"Paid {heist.snitch_user_id} an overdue {reward} in ShadowBeans for snitching on heist {heist_id} in guild {heist.guild_id}")
         return reward
 
     async def expire_overdue(self, guild_id: int) -> list[Heist]:

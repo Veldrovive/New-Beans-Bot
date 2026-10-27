@@ -13,8 +13,7 @@ from beans_bot.services.heists import AlreadyInHeist, CantRobYourself, CodewordT
 
 from conftest import GUILD, HOUSE
 
-CONFIG = HeistConfig()  # Crew of 4+, cuts 10/15/20/25/30%, 25% fines, half to the snitch after a day
-NOW = HeistConfig(snitch_reward_delay=datetime.timedelta(0))
+CONFIG = HeistConfig()  # Crew of 4+, cuts 10/15/20/25/30%, 25% fines, half to the snitch
 TARGET = 50
 CREW = [1, 2, 3, 4]
 COUNCIL = 77
@@ -114,8 +113,9 @@ async def test_success_splits_loot_evenly(heists, snipes, coins):
     assert success.sniper_user_id == 3 and success.shares == {1: 300, 2: 300, 3: 300, 4: 300, 5: 300}
     assert not success.dethroned
     assert await coins.balance(GUILD, TARGET) == 8500
-    assert await coins.balance(GUILD, 3) == 400
-    assert await coins.balance(GUILD, 5) == 300
+    # The loot is in ShadowBeans, so nobody can spot the crew by their balances
+    assert await coins.balance(GUILD, 3) == 100 and await coins.shadow_balance(GUILD, 3) == 300
+    assert await coins.balance(GUILD, 5) == 0 and await coins.shadow_balance(GUILD, 5) == 300
 
     assert await heists.resolve_snipes(GUILD, CONFIG) == []  # Only steals once
     assert await coins.balance(GUILD, TARGET) == 8500
@@ -205,12 +205,13 @@ async def test_outside_snitch_fines_everyone(heists, coins):
     result = await heists.snitch(GUILD, 9, "Badger", CONFIG)
     assert result.fines == {1: 100, 2: 100, 3: 100, 4: 100, 9: 100}
     assert result.total == 500 and result.heist.snitch_reward == 250
-    assert await coins.balance(GUILD, 9) == 300
-    assert await coins.balance(GUILD, HOUSE) == 500
+    # The reward goes straight into the snitch's shadow pocket
+    assert await coins.balance(GUILD, 9) == 300 and await coins.shadow_balance(GUILD, 9) == 250
+    assert await coins.balance(GUILD, HOUSE) == 250
 
     with pytest.raises(NoSuchHeist):
         await heists.snitch(GUILD, 9, "badger", CONFIG)
-    assert await coins.balance(GUILD, HOUSE) == 500
+    assert await coins.balance(GUILD, HOUSE) == 250
 
 
 async def test_crew_snitch_is_fined_once(heists, coins):
@@ -225,32 +226,42 @@ async def test_fines_and_reward_round_down_to_a_cheddar(heists, coins):
     for user_id in CREW[:3]:
         async with coins.db.transaction() as session:
             await coins.move(session, guild_id=GUILD, amount=130, kind=CoinTransactionKind.REACTION, to_user_id=user_id)
-    heist = await plot(heists)
-    result = await heists.snitch(GUILD, 4, "badger", NOW)
+    await plot(heists)
+    result = await heists.snitch(GUILD, 4, "badger", CONFIG)
     assert result.fines == {1: 30, 2: 30, 3: 30, 4: 0}  # 25% of 130 is 32.5, rounded down to 3 cheddar
     assert result.heist.snitch_reward == 40  # Half of 90 is 45, rounded down to 4 cheddar
-    assert heist.id is not None
-    assert await heists.pay_reward(heist.id, NOW.snitch_reward_delay) == 40
+    assert await coins.shadow_balance(GUILD, 4) == 40
     assert await coins.balance(GUILD, HOUSE) == 50
 
 
-async def test_snitch_reward_waits_then_pays_once(heists, coins):
+async def test_snitch_reward_is_paid_on_the_spot(heists, coins):
     for user_id in CREW:
         await fund(coins, user_id, 4)
     heist = await plot(heists)
     await heists.snitch(GUILD, 2, "badger", CONFIG)
     assert heist.id is not None
-
-    assert await heists.due_rewards(GUILD, CONFIG.snitch_reward_delay) == []
-    assert await heists.pay_reward(heist.id, CONFIG.snitch_reward_delay) is None
-    assert await coins.balance(GUILD, 2) == 300
-
-    assert [h.id for h in await heists.due_rewards(GUILD, NOW.snitch_reward_delay)] == [heist.id]
-    assert await heists.pay_reward(heist.id, NOW.snitch_reward_delay) == 200
-    assert await heists.pay_reward(heist.id, NOW.snitch_reward_delay) is None
-    assert await heists.due_rewards(GUILD, NOW.snitch_reward_delay) == []
-    assert await coins.balance(GUILD, 2) == 500
+    assert await coins.balance(GUILD, 2) == 300 and await coins.shadow_balance(GUILD, 2) == 200
     assert await coins.balance(GUILD, HOUSE) == 200
+    assert await heists.unpaid_rewards(GUILD) == []
+    assert await heists.pay_reward(heist.id) is None  # Already paid
+
+
+async def test_rewards_owed_from_before_are_paid_once(heists, coins, db):
+    for user_id in CREW:
+        await fund(coins, user_id, 4)
+    heist = await plot(heists)
+    await heists.snitch(GUILD, 2, "badger", CONFIG)
+    async with db.transaction() as session:  # As if it was snitched while rewards still waited a day
+        old = await session.get(Heist, heist.id)
+        assert old is not None
+        old.reward_paid_at = None
+
+    assert heist.id is not None
+    assert [h.id for h in await heists.unpaid_rewards(GUILD)] == [heist.id]
+    assert await heists.pay_reward(heist.id) == 200
+    assert await heists.pay_reward(heist.id) is None
+    assert await heists.unpaid_rewards(GUILD) == []
+    assert await coins.shadow_balance(GUILD, 2) == 400
 
 
 async def test_snitched_heist_cant_succeed(heists, snipes, coins):

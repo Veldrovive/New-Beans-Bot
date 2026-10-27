@@ -33,7 +33,7 @@ async def test_commands_register(tmp_path: Path):
         names = {c.qualified_name for c in bot.tree.walk_commands()}
         assert {
             "ping", "admin sync", "admin say", "admin dm", "robrole", "jail bribe", "jail frame", "jail current", "jail info", "jail leaderboard",
-            "coins wealth", "coins leaderboard", "bet place", "bet add", "bet swap", "bet stats", "bet close", "bet cancel",
+            "coins wealth", "coins leaderboard", "coins launder", "coins transfer", "admin give", "admin take", "bet place", "bet add", "bet swap", "bet stats", "bet close", "bet cancel",
             "bet resolve", "admin botbet", "autobet post", "fatcow start", "fatcow consumed", "fatcow went", "fatcow leaderboard",
             "vip daypass", "vip henchman", "vip onepercent", "vip status", "manifesto wisdom", "manifesto list",
             "manifesto add", "manifesto edit", "manifesto remove", "heist begin", "heist join", "heist snitch", "heist status",

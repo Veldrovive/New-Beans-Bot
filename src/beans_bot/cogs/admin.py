@@ -3,6 +3,8 @@ Admin tools, for server admins. Every reply here is ephemeral, so nobody sees wh
 - /admin say posts a message as the bot in a channel.
 - /admin dm sends a member a DM from the bot.
 - /admin botbet has the bot (the house) bet in a prediction market thread, after a confirm button.
+- /admin give and /admin take add or remove a member's coins or ShadowBeans. The house is the
+  other side, so coins never appear from nowhere or vanish. The member isn't told.
 """
 
 from __future__ import annotations
@@ -10,7 +12,8 @@ from __future__ import annotations
 import discord
 from discord import app_commands
 
-from beans_bot.cogs.base import BeansCog, admin_only
+from beans_bot.cogs.base import BeansCog, admin_only, requires_feature
+from beans_bot.services.coins import InsufficientFunds
 from beans_bot.services.errors import UserFacingError
 
 # Discord's message length limit.
@@ -133,3 +136,43 @@ class AdminCog(BeansCog):
         )
 
     botbet.autocomplete("choice")(_market_choice_autocomplete)
+
+    @admin.command(name="give", description="Give a member coins or ShadowBeans from the house. Only you see it.")
+    @app_commands.describe(member="Who gets them", amount='How much, like "5" or "3 cheddar"', shadow="Give ShadowBeans instead of regular coins")
+    @requires_feature("coins")
+    @admin_only()
+    async def give(self, interaction: discord.Interaction, member: discord.Member, amount: str, shadow: bool = False):
+        assert interaction.guild_id is not None
+        currency = self.services.currency
+        coins = currency.parse(amount)
+        if member.bot:
+            raise UserFacingError("The house doesn't pay itself. That's called embezzlement.")
+        balance = await self.services.coins.admin_give(interaction.guild_id, interaction.user.id, member.id, coins, shadow=shadow)
+        pocket = "ShadowBeans" if shadow else "balance"
+        await interaction.response.send_message(
+            f"The house slipped {member.mention} {currency.format(coins)}. Their {pocket} is now {currency.format(balance)}. They won't be told.",
+            ephemeral=True,
+        )
+
+    @admin.command(name="take", description="Take a member's coins or ShadowBeans for the house. Only you see it.")
+    @app_commands.describe(member="Who loses them", amount='How much, like "5" or "3 cheddar"', shadow="Take ShadowBeans instead of regular coins")
+    @requires_feature("coins")
+    @admin_only()
+    async def take(self, interaction: discord.Interaction, member: discord.Member, amount: str, shadow: bool = False):
+        assert interaction.guild_id is not None
+        currency = self.services.currency
+        coins = currency.parse(amount)
+        if member.bot:
+            raise UserFacingError("Robbing the house is what heists are for.")
+        pocket = "ShadowBeans" if shadow else "balance"
+        try:
+            balance = await self.services.coins.admin_take(interaction.guild_id, interaction.user.id, member.id, coins, shadow=shadow)
+        except InsufficientFunds as e:
+            raise UserFacingError(
+                f"{member.mention} only has {currency.format(e.balance)} in their {pocket}, not {currency.format(coins)}. "
+                "You can't squeeze blood from a bean."
+            )
+        await interaction.response.send_message(
+            f"Confiscated {currency.format(coins)} from {member.mention}. Their {pocket} is now {currency.format(balance)}. They won't be told.",
+            ephemeral=True,
+        )
