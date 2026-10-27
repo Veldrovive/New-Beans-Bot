@@ -67,6 +67,14 @@ guilds:
       - "{sender} slipped you {amount} under the table. Act natural."
       - "A discreet {amount}, courtesy of {sender}. Nobody else knows. Keep it that way."
       - "{sender} sent you {amount} on the quiet. Spend it like you earned it."
+      transfer_anonymous_scripts:  # {recipient}, {amount}
+      - "An anonymous benefactor just handed {recipient} {amount}. Nobody knows who. Nobody will ever know."
+      - "{recipient} just received {amount} from a mysterious stranger. Hush money? A bribe? A crush? We'll never know."
+      - "A masked figure tossed {amount} at {recipient} and vanished into the night. Suspicious, but legal."
+      transfer_anonymous_dm_scripts:  # {amount}
+      - "Someone slipped you {amount} and won't say who. Don't look behind you."
+      - "{amount}, from a friend. Or an enemy. They didn't leave a name."
+      - "A plain envelope with {amount} inside. No return address. Spend it before they change their mind."
       launder_scripts:  # {amount}, {shadow_left}
       - "Washed, rinsed and pressed. {amount} is in your wallet now, and {shadow_left} is still in the shadows."
       - "{amount} has been laundered. If anyone asks, you found it in a coat. {shadow_left} left in the shadows."

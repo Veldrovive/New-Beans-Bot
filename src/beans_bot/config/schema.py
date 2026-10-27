@@ -104,6 +104,8 @@ class CoinsConfig(StrictModel):
     max_message_age: datetime.timedelta = datetime.timedelta(days=3)
     transfer_scripts: list[str] = []  # {sender}, {recipient}, {amount}. Posted for a public transfer.
     transfer_quiet_scripts: list[str] = []  # {sender}, {amount}. DMed to the recipient of a quiet transfer.
+    transfer_anonymous_scripts: list[str] = []  # {recipient}, {amount}. Posted for a public anonymous transfer.
+    transfer_anonymous_dm_scripts: list[str] = []  # {amount}. DMed to the recipient of a quiet anonymous transfer.
     launder_scripts: list[str] = []  # {amount}, {shadow_left}. Private reply to the launderer.
 
 

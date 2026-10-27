@@ -6,7 +6,8 @@ BeanCoins: earned when others react to your messages with the coin emoji.
 - /coins launder turns ShadowBeans into regular coins. Only you see the reply. Do it a bit at a
   time if you'd rather nobody noticed your balance jump.
 - /coins transfer gives another member some of your coins. A quiet transfer is DMed to the
-  recipient instead of announced, and always says who sent it.
+  recipient instead of announced. A note goes along by DM, never in the announcement. The
+  recipient is told who sent it unless the sender chose to stay anonymous.
 """
 
 import datetime
@@ -99,11 +100,23 @@ class CoinsCog(BeansCog):
 
     @coins_group.command(name="transfer", description="Give another member some of your BeanCoins.")
     @app_commands.describe(
-        member="Who gets the coins", amount='How much, like "5" or "3 cheddar"', quiet="Don't announce it. They still get a DM saying it was you."
+        member="Who gets the coins",
+        amount='How much, like "5" or "3 cheddar"',
+        message="A note for them. It always goes by DM, never in the announcement.",
+        anonymous="Don't tell anyone it was you, not even them",
+        quiet="Don't announce it. They get a DM instead.",
     )
     @requires_feature("coins")
     @in_bot_channel()
-    async def transfer(self, interaction: discord.Interaction, member: discord.Member, amount: str, quiet: bool = False):
+    async def transfer(
+        self,
+        interaction: discord.Interaction,
+        member: discord.Member,
+        amount: str,
+        message: app_commands.Range[str, 1, 1500] | None = None,
+        anonymous: bool = False,
+        quiet: bool = False,
+    ):
         assert interaction.guild_id is not None
         config = self.guild_config(interaction.guild_id)
         assert config is not None and config.coins is not None
@@ -119,17 +132,47 @@ class CoinsCog(BeansCog):
             raise UserFacingError(f"You tried to send {currency.format(coins)} but only have {currency.format(e.balance)}. Generous of you, in theory.")
 
         values = {"sender": interaction.user.mention, "recipient": member.mention, "amount": currency.format(coins)}
-        if not quiet:
+        ping = discord.AllowedMentions(users=[member])
+        if not quiet and not anonymous:
             text = scripts.pick(config.coins.transfer_scripts, **values)
             text = text or f"{values['sender']} just handed {values['recipient']} {values['amount']}. No strings attached. Probably."
-            await interaction.response.send_message(text, allowed_mentions=discord.AllowedMentions(users=[member]))
+            await interaction.response.send_message(text, allowed_mentions=ping)
+        else:
+            secret = "They'll never know it was you." if anonymous else "They'll know it was you."
+            note = " Your note goes by DM." if message else ""
+            await interaction.response.send_message(f"Done. {values['amount']} slipped to {member.mention}. {secret}{note}", ephemeral=True)
+        if not quiet and anonymous:
+            # Sent separately, because replying to the command would show who ran it.
+            text = scripts.pick(config.coins.transfer_anonymous_scripts, recipient=values["recipient"], amount=values["amount"])
+            text = text or f"An anonymous benefactor just handed {values['recipient']} {values['amount']}. Nobody knows who. Nobody will ever know."
+            try:
+                if isinstance(interaction.channel, discord.abc.Messageable):
+                    await interaction.channel.send(text, allowed_mentions=ping)
+            except discord.HTTPException:
+                self.logger.warning(f"Could not announce an anonymous transfer to {member.id} in guild {interaction.guild_id}")
+
+        # The DM: always for a quiet transfer, and for a public one only when there's a note.
+        if quiet and anonymous:
+            text = scripts.pick(config.coins.transfer_anonymous_dm_scripts, amount=values["amount"])
+            text = text or f"Someone slipped you {values['amount']} and won't say who. Don't look behind you."
+        elif quiet:
+            text = scripts.pick(config.coins.transfer_quiet_scripts, sender=values["sender"], amount=values["amount"])
+            text = text or f"{values['sender']} slipped you {values['amount']} under the table. Act natural."
+        elif message:
+            sender = "Someone who won't say who" if anonymous else values["sender"]
+            text = f"{sender} sent a note with the {values['amount']}:"
+        else:
             return
-        await interaction.response.send_message(f"Done. {values['amount']} slipped to {member.mention}. They'll know it was you.", ephemeral=True)
-        text = scripts.pick(config.coins.transfer_quiet_scripts, sender=values["sender"], amount=values["amount"])
+        if message:
+            text += f"\n>>> {message}"
         try:
-            await member.send(text or f"{values['sender']} slipped you {values['amount']} under the table. Act natural.")
+            await member.send(text, allowed_mentions=discord.AllowedMentions.none())
         except discord.HTTPException:
-            self.logger.info(f"Could not DM {member.id} about a quiet transfer from {interaction.user.id}")
+            self.logger.info(f"Could not DM {member.id} about a transfer from {interaction.user.id}")
+            if message:
+                await interaction.followup.send(
+                    f"{member.mention} has their DMs locked, so your note didn't make it. The coins did. Write it on a napkin.", ephemeral=True
+                )
 
     @coins_group.command(name="leaderboard", description="Show who has the most BeanCoins.")
     @app_commands.describe(quiet=QUIET_HELP)
