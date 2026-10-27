@@ -386,10 +386,10 @@ guilds:
       min_crew: 4  # The leader counts
       cuts:  # Crew size -> percent of the target's coins stolen. Bigger crews get the biggest size listed.
         4: 50
-        5: 55
-        6: 65
-        7: 75
-        8: 90
+        5: 60
+        6: 75
+        7: 90
+        8: 100
       duration: P3D
       snitch_fine_percent: 25
       snitch_reward_percent: 50
