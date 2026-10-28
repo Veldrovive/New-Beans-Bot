@@ -342,6 +342,14 @@ guilds:
           words: "Terminus"
           user_id: 588908461149126656
           crest_emoji: ":terminus:"
+        katie:
+          internal_name: "Katie"
+          ted_id: 5
+          council_name: "The First True Katie"
+          epithets: ["Autistic"]
+          words: "Aetherius"
+          user_id: 566687570898059275
+          crest_emoji: ":aetherius:"
     # Snipes: photos of members in the snipe channel, verified by the council's crest reactions.
     snipes:
       channel_id: 1491887341353308221
