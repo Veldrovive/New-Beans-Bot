@@ -240,6 +240,7 @@ class JailCog(BeansCog):
 
     @jail_group.command(name="bribe", description="Bribe the bot to let you out of jail.")
     @requires_feature("jail")
+    @in_bot_channel()
     async def bribe(self, interaction: discord.Interaction):
         assert interaction.guild is not None
         config = self.jail_config(interaction.guild_id)
@@ -274,6 +275,7 @@ class JailCog(BeansCog):
     @jail_group.command(name="frame", description="Pay the bot to send someone to jail. Pay extra to keep your name out of it.")
     @app_commands.describe(member="Who belongs in the stocks", anonymous="Pay the anonymous price so nobody knows it was you")
     @requires_feature("jail")
+    @in_bot_channel()
     async def frame(self, interaction: discord.Interaction, member: discord.Member, anonymous: bool = False):
         assert interaction.guild is not None and interaction.channel_id is not None
         config = self.jail_config(interaction.guild_id)

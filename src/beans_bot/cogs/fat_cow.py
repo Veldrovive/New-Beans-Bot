@@ -5,7 +5,7 @@ from discord import app_commands
 from sqlalchemy import func
 from sqlmodel import col, select
 
-from beans_bot.cogs.base import QUIET_HELP, BeansCog, requires_feature
+from beans_bot.cogs.base import QUIET_HELP, BeansCog, in_bot_channel, requires_feature
 from beans_bot.config.schema import FatCowReactions
 from beans_bot.db.models import FatCowConsumption, FatCowVisit
 from beans_bot.services import emoji
@@ -38,6 +38,7 @@ class FatCowCog(BeansCog):
 
     @fatcow.command(name="start", description="Record that we went to Palace Tang today.")
     @requires_feature("fat_cow")
+    @in_bot_channel()
     async def start(self, interaction: discord.Interaction):
         assert interaction.guild_id is not None
         async with self.services.db.transaction() as session:
@@ -47,11 +48,13 @@ class FatCowCog(BeansCog):
     @fatcow.command(name="consumed", description="Record how much fat cow you ate.")
     @app_commands.describe(meters="Meters of fat cow eaten")
     @requires_feature("fat_cow")
+    @in_bot_channel()
     async def consumed(self, interaction: discord.Interaction, meters: app_commands.Range[float, 0.0]):
         await self.record(interaction, meters)
 
     @fatcow.command(name="went", description="Record that you went without eating any fat cow.")
     @requires_feature("fat_cow")
+    @in_bot_channel()
     async def went(self, interaction: discord.Interaction):
         await self.record(interaction, 0.0)
 
@@ -81,6 +84,7 @@ class FatCowCog(BeansCog):
     @fatcow.command(name="leaderboard", description="Show everyone's fat cow stats.")
     @app_commands.describe(quiet=QUIET_HELP)
     @requires_feature("fat_cow")
+    @in_bot_channel()
     async def leaderboard(self, interaction: discord.Interaction, quiet: bool = False):
         assert interaction.guild is not None
         guild_id = interaction.guild.id

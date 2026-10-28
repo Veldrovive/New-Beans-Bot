@@ -63,9 +63,14 @@ def requires_feature(feature: str):
 
 
 def in_bot_channel():
-    """Only allow the command in the guild's bot channel, if it has one."""
+    """
+    Only allow the command in the guild's bot channel, if it has one. Commands that post publicly use it, so the
+    spam stays in one place. With `quiet` set nobody else sees the reply, so it's allowed anywhere.
+    """
 
     async def predicate(interaction: discord.Interaction) -> bool:
+        if getattr(interaction.namespace, "quiet", False):
+            return True
         config = _interaction_guild_config(interaction)
         if config is not None and config.bot_channel_id and interaction.channel_id != config.bot_channel_id:
             raise CheckMessage(f"Please use this command in <#{config.bot_channel_id}>.")

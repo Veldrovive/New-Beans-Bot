@@ -52,7 +52,7 @@ Rules the structure depends on:
 
 **Discord**
 - Every command is a slash command. Group a feature's commands with `app_commands.Group(name=..., guild_only=True)` as a class attribute.
-- Guard guild commands with `@requires_feature("<config section>")` and usually `@in_bot_channel()`. Use `@owner_only()` for admin commands.
+- Guard guild commands with `@requires_feature("<config section>")`. Add `@in_bot_channel()` to any command that posts something everyone can see in the channel it was run in. It lets `quiet=True` through, so private-only commands run anywhere. Commands tied to a place (`/bet` in market threads, the Impart wisdom menu) and admin tools skip it. Use `@owner_only()` for admin commands.
 - In code, a server is a **guild** (`guild_id`, `guilds:`). Text the bot sends to members still says "server".
 - Errors and private info go in `ephemeral=True` replies. Announcements are public. When a message mentions people but shouldn't ping them (status, leaderboards), pass `allowed_mentions=discord.AllowedMentions.none()`.
 - Fine print goes on a `-#` subtext line. Use `discord.utils.format_dt(dt, "R")` for times.

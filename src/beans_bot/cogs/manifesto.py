@@ -20,7 +20,7 @@ from typing import Any
 import discord
 from discord import app_commands
 
-from beans_bot.cogs.base import BeansCog, requires_feature
+from beans_bot.cogs.base import BeansCog, in_bot_channel, requires_feature
 from beans_bot.services import scripts
 from beans_bot.services.errors import UserFacingError
 from beans_bot.services.manifesto import NoManifesto, NoSuchWisdom, NotTheOnePercent, NotYourWisdom, Wisdom, WrittenInStone
@@ -114,6 +114,7 @@ class ManifestoCog(BeansCog):
         wisdom_index="Which piece of wisdom (see /manifesto list). Leave it out for a random one.",
     )
     @requires_feature("manifesto")
+    @in_bot_channel()
     async def wisdom(
         self,
         interaction: discord.Interaction,
@@ -159,6 +160,7 @@ class ManifestoCog(BeansCog):
         member="Whose manifesto to add to. Only the 1% may pick someone else. Leave it out for your own.",
     )
     @requires_feature("manifesto")
+    @in_bot_channel()
     async def add(self, interaction: discord.Interaction, statement: WisdomText, member: discord.Member | None = None):
         assert interaction.guild_id is not None
         config = self.guild_config(interaction.guild_id)

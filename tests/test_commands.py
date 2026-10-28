@@ -1,13 +1,16 @@
 """Every cog loads and its slash commands build valid Discord payloads, without connecting to Discord."""
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import discord
+import pytest
 
 from beans_bot.bot import BeansBot
 from beans_bot.cogs.action_holiday import ActionHolidayCog
 from beans_bot.cogs.admin import AdminCog
 from beans_bot.cogs.auto_bets import AutoBetsCog
+from beans_bot.cogs.base import CheckMessage, in_bot_channel
 from beans_bot.cogs.basic import BasicCog
 from beans_bot.cogs.birthday import BirthdayCog
 from beans_bot.cogs.coins import CoinsCog
@@ -20,7 +23,7 @@ from beans_bot.cogs.role_name import RoleNameCog
 from beans_bot.cogs.snipes import SnipesCog
 from beans_bot.cogs.tomatoes import TomatoesCog
 from beans_bot.cogs.vip import VipCog
-from beans_bot.config.schema import BotConfig
+from beans_bot.config.schema import BotConfig, GuildConfig
 
 COGS = (BasicCog, AdminCog, RoleNameCog, JailCog, TomatoesCog, CoinsCog, GamblingCog, AutoBetsCog, FatCowCog, BirthdayCog, ActionHolidayCog, VipCog, SnipesCog, ManifestoCog, HeistCog)
 
@@ -48,3 +51,21 @@ async def test_commands_register(tmp_path: Path):
         for name in list(bot.cogs):
             await bot.remove_cog(name)
         await bot.services.db.close()
+
+
+async def test_bot_channel_check_lets_quiet_commands_through():
+    config = BotConfig(bot_token="x", guilds={1: GuildConfig(name="test", bot_channel_id=10)})
+
+    @in_bot_channel()
+    async def command(interaction: discord.Interaction): ...
+
+    check = getattr(command, "__discord_app_commands_checks__")[0]
+
+    def interaction(channel_id: int, **options: object):
+        return SimpleNamespace(guild_id=1, channel_id=channel_id, client=SimpleNamespace(config=config), namespace=SimpleNamespace(**options))
+
+    assert await check(interaction(10))
+    assert await check(interaction(20, quiet=True))
+    for loud in (interaction(20), interaction(20, quiet=False)):
+        with pytest.raises(CheckMessage):
+            await check(loud)
