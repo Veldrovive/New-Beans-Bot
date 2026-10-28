@@ -112,7 +112,7 @@ class CoinsCog(BeansCog):
             self.logger.error(f"Bot channel {guild_config.bot_channel_id} not found in guild {guild.id}")
             return
         text = scripts.pick(config.launder_announce_scripts, amount=amount)
-        text = text or "Somebody just laundered some ShadowBeans. The money is clean. The hands are not. Nobody saw anything."
+        text = text or f"Somebody just laundered {amount}. The money is clean. The hands are not. Nobody saw anything."
         try:
             await channel.send(text, allowed_mentions=discord.AllowedMentions.none())
         except discord.HTTPException:
