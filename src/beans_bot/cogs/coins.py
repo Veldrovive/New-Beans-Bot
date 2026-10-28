@@ -4,7 +4,8 @@ BeanCoins: earned when others react to your messages with the coin emoji.
 - /coins wealth shows a balance. Checking yourself quietly also shows your ShadowBean Coins,
   which nobody else ever sees.
 - /coins launder turns ShadowBeans into regular coins. Only you see the reply. Do it a bit at a
-  time if you'd rather nobody noticed your balance jump.
+  time if you'd rather nobody noticed your balance jump. The bot channel is told that someone
+  laundered money, but not who (turn off with announce_launders).
 - /coins transfer gives another member some of your coins. A quiet transfer is DMed to the
   recipient instead of announced. A note goes along by DM, never in the announcement. The
   recipient is told who sent it unless the sender chose to stay anonymous.
@@ -16,6 +17,7 @@ import discord
 from discord import app_commands
 
 from beans_bot.cogs.base import QUIET_HELP, BeansCog, in_bot_channel, requires_feature
+from beans_bot.config.schema import CoinsConfig
 from beans_bot.services import emoji, scripts
 from beans_bot.services.coins import CantPayYourself, InsufficientFunds, NothingToLaunder, ReactionGrantResult
 from beans_bot.services.errors import UserFacingError
@@ -97,6 +99,24 @@ class CoinsCog(BeansCog):
         text = text or f"Washed and pressed. {values['amount']} is in your wallet now, and {values['shadow_left']} is still in the shadows."
         text += "\n-# Your balance just went up. Try not to look so pleased about it."
         await interaction.response.send_message(text, ephemeral=True)
+        if config.coins.announce_launders and interaction.guild is not None:
+            await self.announce_launder(interaction.guild, config.coins, values["amount"])
+
+    async def announce_launder(self, guild: discord.Guild, config: CoinsConfig, amount: str) -> None:
+        """Tell the bot channel some money got cleaned. Never says who."""
+        guild_config = self.guild_config(guild.id)
+        if guild_config is None or guild_config.bot_channel_id is None:
+            return
+        channel = guild.get_channel(guild_config.bot_channel_id)
+        if not isinstance(channel, discord.abc.Messageable):
+            self.logger.error(f"Bot channel {guild_config.bot_channel_id} not found in guild {guild.id}")
+            return
+        text = scripts.pick(config.launder_announce_scripts, amount=amount)
+        text = text or "Somebody just laundered some ShadowBeans. The money is clean. The hands are not. Nobody saw anything."
+        try:
+            await channel.send(text, allowed_mentions=discord.AllowedMentions.none())
+        except discord.HTTPException:
+            self.logger.warning(f"Could not announce a launder in guild {guild.id}")
 
     @coins_group.command(name="transfer", description="Give another member some of your BeanCoins.")
     @app_commands.describe(

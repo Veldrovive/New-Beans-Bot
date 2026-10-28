@@ -93,6 +93,11 @@ guilds:
       - "Washed, rinsed and pressed. {amount} is in your wallet now, and {shadow_left} is still in the shadows."
       - "{amount} has been laundered. If anyone asks, you found it in a coat. {shadow_left} left in the shadows."
       - "Clean as a whistle. {amount} is now perfectly legitimate money. {shadow_left} is still waiting its turn."
+      announce_launders: true
+      launder_announce_scripts:  # {amount}. Posted to the bot channel. Never names the launderer.
+      - "Somebody just laundered some ShadowBeans. The money is clean. The hands are not. Nobody saw anything."
+      - "A suspicious amount of money just came out of the wash. The house asks no questions. Neither should you."
+      - "Someone among you is laundering money. Look at your friends. Really look at them."
     gambling:
       forum_channel_id: 1524436342665248898
       bot_betting:

@@ -107,6 +107,9 @@ class CoinsConfig(StrictModel):
     transfer_anonymous_scripts: list[str] = []  # {recipient}, {amount}. Posted for a public anonymous transfer.
     transfer_anonymous_dm_scripts: list[str] = []  # {amount}. DMed to the recipient of a quiet anonymous transfer.
     launder_scripts: list[str] = []  # {amount}, {shadow_left}. Private reply to the launderer.
+    # Tell the bot channel that someone laundered money, without saying who.
+    announce_launders: bool = True
+    launder_announce_scripts: list[str] = []  # {amount}. Posted to the bot channel. Never names the launderer.
 
 
 class BotBettingConfig(StrictModel):
