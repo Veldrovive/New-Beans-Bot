@@ -3,7 +3,7 @@ import datetime
 import pytest
 
 from beans_bot.config.schema import BotBettingConfig
-from beans_bot.db.models import CoinTransactionKind, JailReason, PredictionMarket
+from beans_bot.db.models import CoinTransactionKind, JailReason, MarketStatus, PredictionMarket
 from beans_bot.db.types import utcnow
 from beans_bot.services.errors import UserFacingError
 from beans_bot.services.markets import InvalidMarket, parse_choices
@@ -283,3 +283,84 @@ async def test_beating_the_house_alone_after_the_window_pays_out(markets, coins,
     assert resolution.payouts == [(CREATOR, 600)]
     assert await coins.balance(GUILD, CREATOR) == 600
     assert await coins.balance(GUILD, HOUSE) == -500
+
+
+async def test_stats_hide_the_house_bet(markets, coins, db, market):
+    await markets.house_bet(THREAD, "yes", 500)
+    await fund(coins, db, 1, 100)
+    await markets.place_bet(THREAD, 1, "no", 100)
+
+    stats = await markets.stats(THREAD)
+    assert (stats.pool, stats.by_choice) == (100, {"yes": 0, "no": 100})
+
+
+async def test_resolution_reveals_the_house_bet(markets, coins, db, market):
+    await markets.house_bet(THREAD, "yes", 400)
+    await fund(coins, db, 1, 100)
+    await markets.place_bet(THREAD, 1, "no", 100)
+
+    resolution = await markets.resolve(THREAD, CREATOR, "yes")
+    assert resolution.house_bet == ("yes", 400)
+
+
+async def hedge_and_rob_the_house(markets, coins, db):
+    """The two-account scam: a bet on each side, then resolve against the house."""
+    await markets.house_bet(THREAD, "yes", 400)
+    await fund(coins, db, 1, 100)
+    await fund(coins, db, 2, 100)
+    await markets.place_bet(THREAD, 1, "no", 100)
+    await markets.place_bet(THREAD, 2, "yes", 100)
+    resolution = await markets.resolve(THREAD, CREATOR, "no")
+    assert resolution.payouts == [(1, 600)]
+
+
+async def test_nullify_takes_back_payouts_into_debt(markets, coins, db, market):
+    await hedge_and_rob_the_house(markets, coins, db)
+    # The winner spends most of it before anyone notices.
+    async with db.transaction() as session:
+        await coins.move(session, guild_id=GUILD, amount=500, kind=CoinTransactionKind.TRANSFER, from_user_id=1, to_user_id=3)
+
+    nullification = await markets.nullify(THREAD, CREATOR)
+    assert nullification.nets == [(1, -500), (2, 100), (HOUSE, 400)]
+    assert await coins.balance(GUILD, 1) == -400
+    assert await coins.balance(GUILD, 2) == 100
+    assert await coins.balance(GUILD, 3) == 500
+    assert await coins.balance(GUILD, HOUSE) == 0
+    stored = await markets.get(THREAD)
+    assert stored is not None and stored.status == MarketStatus.NULLIFIED
+
+    with pytest.raises(UserFacingError, match="nullified"):
+        await markets.nullify(THREAD, CREATOR)
+    with pytest.raises(UserFacingError, match="nullified"):
+        await markets.cancel(THREAD, None)
+    assert await coins.balance(GUILD, 1) == -400
+
+
+async def test_nullify_leaves_earlier_house_bet_switches_alone(markets, coins, db, market):
+    await markets.house_bet(THREAD, "no", 300)
+    await markets.house_bet(THREAD, "yes", 400)
+    await fund(coins, db, 1, 100)
+    await markets.place_bet(THREAD, 1, "no", 100)
+    await fund(coins, db, 2, 100)
+    await markets.place_bet(THREAD, 2, "yes", 100)
+    await markets.resolve(THREAD, CREATOR, "no")
+
+    await markets.nullify(THREAD, CREATOR)
+    assert await coins.balance(GUILD, 1) == 100
+    assert await coins.balance(GUILD, 2) == 100
+    assert await coins.balance(GUILD, HOUSE) == 0
+
+
+async def test_nullify_needs_a_resolved_market_with_payouts(markets, coins, db, market):
+    await fund(coins, db, 1, 100)
+    await markets.place_bet(THREAD, 1, "yes", 100)
+    with pytest.raises(UserFacingError, match="open"):
+        await markets.nullify(THREAD, CREATOR)
+
+    # Everyone picked the winner, so everyone was refunded already.
+    await markets.resolve(THREAD, CREATOR, "yes")
+    with pytest.raises(UserFacingError, match="nothing to nullify"):
+        await markets.nullify(THREAD, CREATOR)
+    assert await coins.balance(GUILD, 1) == 100
+    stored = await markets.get(THREAD)
+    assert stored is not None and stored.status == MarketStatus.RESOLVED

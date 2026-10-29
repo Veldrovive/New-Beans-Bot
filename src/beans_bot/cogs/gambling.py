@@ -8,6 +8,7 @@ automatic bets itself (see cogs/auto_bets.py), and their admins manage them.
   @everyone in the bot channel and sends them to jail.
 - If only the house lost, soon after the market opened, the winners are refunded
   instead of paid, and go to jail where they can't bet.
+- The house's bet is a secret. /bet stats leaves it out, and it's revealed when the market resolves.
 """
 
 from __future__ import annotations
@@ -25,7 +26,13 @@ from beans_bot.db.models import JailReason
 from beans_bot.services import scripts
 from beans_bot.services.errors import UserFacingError
 from beans_bot.services.jail import JailOutcome
-from beans_bot.services.markets import InvalidMarket, market_instructions, parse_choices
+from beans_bot.services.markets import (
+    SECRET_BET_ANNOUNCEMENT,
+    InvalidMarket,
+    Resolution,
+    market_instructions,
+    parse_choices,
+)
 
 
 class GamblingCog(BeansCog):
@@ -70,7 +77,7 @@ class GamblingCog(BeansCog):
         if amount is not None:
             choice = random.choice(choices)
             await self.services.markets.house_bet(thread.id, choice, amount)
-            await thread.send(f"I am joining the fray! I bet {self.services.currency.format(amount)} on {choice}!")
+            await thread.send(SECRET_BET_ANNOUNCEMENT)
 
     @BeansCog.listener()
     async def on_raw_thread_delete(self, payload: discord.RawThreadDeleteEvent):
@@ -210,6 +217,7 @@ class GamblingCog(BeansCog):
                 lines.append(f"- **{choice}**: nothing bet (No payout)")
             else:
                 lines.append(f"- **{choice}**: {currency.format(total)} bet (Payout ratio: {stats.pool / total:.2f}x)")
+        lines.append("-# Members' bets only. If I bet, it's a secret until this resolves, so the real odds are anyone's guess.")
         await interaction.response.send_message("\n".join(lines), ephemeral=quiet)
 
     @bet.command(name="close", description="Market manager: stop accepting bets without naming a winner yet.")
@@ -245,7 +253,16 @@ class GamblingCog(BeansCog):
             lines += [f"- <@{user_id}>: {currency.format(amount)}" for user_id, amount in resolution.payouts]
             lines.append(f"And the house took {currency.format(resolution.house_remainder)}.")
             text = "\n".join(lines)
+        if reveal := self._reveal_house_bet(resolution):
+            text += f"\n{reveal}"
         await interaction.response.send_message(text)
+
+    def _reveal_house_bet(self, resolution: Resolution) -> str | None:
+        if resolution.house_bet is None:
+            return None
+        choice, amount = resolution.house_bet
+        verdict = "Called it." if choice == resolution.winning_choice else "Don't tell anyone."
+        return f"My secret bet: {self.services.currency.format(amount)} on **{choice}**. {verdict}"
 
     resolve.autocomplete("winner")(_choice_autocomplete)
 

@@ -29,6 +29,7 @@ class CoinTransactionKind(StrEnum):
     BET_REFUND = "bet_refund"  # Market escrow -> bettor
     BET_PAYOUT = "bet_payout"  # Market escrow -> winner
     HOUSE_REMAINDER = "house_remainder"  # Market escrow -> house (rounding leftovers)
+    BET_NULLIFY = "bet_nullify"  # Winner -> market escrow, when an admin nullifies a resolved market (may leave them in debt)
     VIP_DAY_PASS = "vip_day_pass"  # Member -> house
     VIP_ONE_PERCENT = "vip_one_percent"  # Member -> house, to claim the one permanent VIP title
     HEIST_LOOT = "heist_loot"  # Target -> crew member (old heists, before loot went into the shadow pocket)

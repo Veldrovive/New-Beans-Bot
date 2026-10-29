@@ -22,7 +22,7 @@ from beans_bot.cogs.base import BeansCog, admin_only
 from beans_bot.services import scripts
 from beans_bot.services.auto_bets import load_bets
 from beans_bot.services.errors import UserFacingError
-from beans_bot.services.markets import market_instructions
+from beans_bot.services.markets import SECRET_BET_ANNOUNCEMENT, market_instructions
 from beans_bot.services.scheduling import DailyJob
 
 
@@ -105,7 +105,7 @@ class AutoBetsCog(BeansCog):
         if amount is not None:
             choice = random.choice(draw.bet.choices)
             await self.services.markets.house_bet(thread.id, choice, amount)
-            await thread.send(f"And I'm putting {self.services.currency.format(amount)} on {choice}, because I know things.")
+            await thread.send(SECRET_BET_ANNOUNCEMENT)
         return thread
 
     # --- /autobet -----------------------------------------------------------------------

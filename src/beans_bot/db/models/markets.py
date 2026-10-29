@@ -11,6 +11,7 @@ class MarketStatus(StrEnum):
     CLOSED = "closed"  # No more bets, waiting for a winner
     RESOLVED = "resolved"
     CANCELED = "canceled"
+    NULLIFIED = "nullified"  # Resolved, then an admin took the payouts back and refunded every stake
 
 
 class PredictionMarket(SQLModel, table=True):

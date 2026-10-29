@@ -78,11 +78,13 @@ class CoinService:
         thread_id: int | None = None,
         from_shadow: bool = False,
         to_shadow: bool = False,
+        overdraft: bool = False,
     ) -> CoinTransaction:
         """
         Debit `from_user_id` and credit `to_user_id` (either may be None) and record it. `from_shadow`
         and `to_shadow` use that side's shadow pocket instead of its balance. Raises InsufficientFunds
-        if the debited pocket can't cover it, unless it is the house's balance.
+        if the debited pocket can't cover it, unless it is the house's balance or `overdraft` is set
+        (taking back coins a member already spent, which leaves them in debt).
         """
         if amount <= 0:
             raise ValueError(f"Coin moves must be positive, got {amount}")
@@ -97,7 +99,7 @@ class CoinService:
                     raise InsufficientFunds(source.shadow_balance, amount)
                 source.shadow_balance -= amount
             else:
-                if from_user_id != self.house_user_id and source.balance < amount:
+                if from_user_id != self.house_user_id and not overdraft and source.balance < amount:
                     raise InsufficientFunds(source.balance, amount)
                 source.balance -= amount
         if to_user_id is not None:

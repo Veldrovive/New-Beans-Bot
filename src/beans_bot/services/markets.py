@@ -10,6 +10,10 @@ The cog makes them pay for it with jail and an @everyone.
   one that lost, the winners were just taking the bot's money, alone or as a
   gang. Everyone gets their own stake back, and the cog jails every winner.
 - Members jailed for rigging can't place or add to bets. Nobody in jail can swap.
+- The house's bet is a secret until the market resolves: stats leave it out, and the
+  resolution reveals it. Scammers have to guess which side to rob.
+- Admins can nullify a resolved market: everything it paid out is taken back, even if that
+  puts members in debt, and every stake is refunded, as if it had been canceled.
 """
 
 from __future__ import annotations
@@ -19,12 +23,12 @@ import logging
 import random
 from dataclasses import dataclass, field
 
-from sqlmodel import select
+from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from beans_bot.config.schema import BotBettingConfig
 from beans_bot.db.engine import Database
-from beans_bot.db.models import CoinTransactionKind, JailReason, MarketBet, MarketStatus, PredictionMarket
+from beans_bot.db.models import CoinTransaction, CoinTransactionKind, JailReason, MarketBet, MarketStatus, PredictionMarket
 from beans_bot.db.types import utcnow
 from beans_bot.services.coins import CoinService, InsufficientFunds
 from beans_bot.services.errors import UserFacingError
@@ -33,6 +37,11 @@ from beans_bot.services.jail import JailService
 logger = logging.getLogger(__name__)
 
 RESERVED_CHOICE_WORDS = ("close", "cancel", "wins")
+FINISHED = (MarketStatus.RESOLVED, MarketStatus.CANCELED, MarketStatus.NULLIFIED)
+# The house never says what it bet on, or how much, until the market resolves.
+SECRET_BET_ANNOUNCEMENT = (
+    "I am joining the fray! What did I bet, and on what? That's between me and the beans. You'll find out when it resolves."
+)
 
 
 class InvalidMarket(UserFacingError):
@@ -79,7 +88,8 @@ def market_instructions(choices: list[str], manager_ids: list[int]) -> str:
         "However, if you want to lose more money you can use `/bet add` to increase your bet.",
         "Changed your mind? `/bet swap` moves your whole bet, but it tells @everyone and sends you to jail.",
         "If I'm the only loser and it resolves right away, I'll assume you cheated, and cheaters don't bet from jail.",
-        "Check the pool and odds: `/bet stats`",
+        "I might have a secret bet in here too. You'll find out what it was when it resolves.",
+        "Check the pool and odds (my bet not included): `/bet stats`",
         "",
         f"Commands for the prediction market manager{'s' if len(manager_ids) > 1 else ''}, {', '.join(f'<@{m}>' for m in manager_ids)}:",
         "- Close betting and refund everyone: `/bet cancel`",
@@ -110,6 +120,12 @@ class Resolution:
     house_remainder: int = 0
     rigged_by: list[int] = field(default_factory=list)  # Winners who only beat the house. Refunded, and the cog jails them.
     denied: int = 0  # The house's stake the riggers didn't get
+    house_bet: tuple[str, int] | None = None  # (choice, amount): the house's secret bet, revealed now
+
+
+@dataclass
+class Nullification:
+    nets: list[tuple[int, int]]  # (user_id, amount): what each bettor got back (positive) or gave back (negative)
 
 
 class MarketService:
@@ -184,6 +200,8 @@ class MarketService:
             market = await self._market(session, thread_id)
             by_choice = {c: 0 for c in market.choices}
             for bet in await self._bets(session, thread_id):
+                if bet.user_id == self.coins.house_user_id:
+                    continue  # The house's bet is a secret until the market resolves
                 by_choice[bet.choice] = by_choice.get(bet.choice, 0) + bet.amount
             return MarketStats(pool=sum(by_choice.values()), by_choice=by_choice)
 
@@ -216,7 +234,7 @@ class MarketService:
             market = await self._market(session, thread_id)
             if user_id is not None:
                 self._require_creator(market, user_id)
-            if market.status in (MarketStatus.RESOLVED, MarketStatus.CANCELED):
+            if market.status in FINISHED:
                 raise UserFacingError(f"Market is already {market.status}.")
             bets = await self._bets(session, thread_id)
             await self._refund_all(session, market, bets)
@@ -231,7 +249,7 @@ class MarketService:
         async with self.db.transaction() as session:
             market = await self._market(session, thread_id)
             self._require_creator(market, user_id)
-            if market.status in (MarketStatus.RESOLVED, MarketStatus.CANCELED):
+            if market.status in FINISHED:
                 raise UserFacingError(f"Market is already {market.status}.")
             if winning_choice not in market.choices:
                 raise UserFacingError(f"Invalid option '{winning_choice}'. Valid choices: {', '.join(market.choices)}")
@@ -244,7 +262,10 @@ class MarketService:
             pool = sum(b.amount for b in bets)
             winning_bets = [b for b in bets if b.choice == winning_choice]
             winning_total = sum(b.amount for b in winning_bets)
-            resolution = Resolution(winning_choice=winning_choice, pool=pool)
+            house_bet = next((b for b in bets if b.user_id == self.coins.house_user_id), None)
+            resolution = Resolution(
+                winning_choice=winning_choice, pool=pool, house_bet=(house_bet.choice, house_bet.amount) if house_bet else None
+            )
 
             if pool == 0:
                 return resolution
@@ -296,6 +317,58 @@ class MarketService:
                     thread_id=thread_id,
                 )
             return resolution
+
+    async def nullify(self, thread_id: int, admin_id: int) -> Nullification:
+        """
+        Undo a resolved market: take back everything it paid out and refund every stake, as if it had
+        been canceled. Members who already spent their winnings go into debt.
+        """
+        async with self.db.transaction() as session:
+            market = await self._market(session, thread_id)
+            if market.status != MarketStatus.RESOLVED:
+                raise UserFacingError(f"Only resolved markets can be nullified. This one is {market.status}.")
+            assert market.resolved_at is not None
+            # What the market paid out at resolve. Earlier escrow moves (the house switching its bet) stay put.
+            result = await session.exec(
+                select(CoinTransaction).where(
+                    col(CoinTransaction.thread_id) == thread_id, col(CoinTransaction.from_user_id).is_(None)
+                )
+            )
+            nets: dict[int, int] = {}
+            for bet in await self._bets(session, thread_id):
+                nets[bet.user_id] = nets.get(bet.user_id, 0) + bet.amount
+            for paid in result.all():
+                if paid.to_user_id is not None and paid.created_at >= market.resolved_at:
+                    nets[paid.to_user_id] = nets.get(paid.to_user_id, 0) - paid.amount
+            nets = {user_id: net for user_id, net in nets.items() if net != 0}
+            if not nets:
+                raise UserFacingError("Everyone already got exactly their stake back. There's nothing to nullify.")
+
+            for user_id, net in nets.items():
+                if net > 0:
+                    await self.coins.move(
+                        session,
+                        guild_id=market.guild_id,
+                        amount=net,
+                        kind=CoinTransactionKind.BET_REFUND,
+                        to_user_id=user_id,
+                        actor_user_id=admin_id,
+                        thread_id=thread_id,
+                    )
+                else:
+                    await self.coins.move(
+                        session,
+                        guild_id=market.guild_id,
+                        amount=-net,
+                        kind=CoinTransactionKind.BET_NULLIFY,
+                        from_user_id=user_id,
+                        actor_user_id=admin_id,
+                        thread_id=thread_id,
+                        overdraft=True,
+                    )
+            market.status = MarketStatus.NULLIFIED
+            logger.info(f"Admin {admin_id} nullified market {thread_id} in guild {market.guild_id}: {nets}")
+            return Nullification(nets=sorted(nets.items(), key=lambda item: item[1]))
 
     # --- Betting ------------------------------------------------------------------------
 

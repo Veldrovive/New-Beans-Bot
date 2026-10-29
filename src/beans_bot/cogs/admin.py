@@ -3,6 +3,9 @@ Admin tools, for server admins. Every reply here is ephemeral, so nobody sees wh
 - /admin say posts a message as the bot in a channel.
 - /admin dm sends a member a DM from the bot.
 - /admin botbet has the bot (the house) bet in a prediction market thread, after a confirm button.
+  Like every house bet, it's a secret until the market resolves.
+- /admin nullifybet undoes a resolved market: payouts are taken back (into debt if they were
+  spent) and every stake is refunded. The thread hears about it, but not who did it.
 - /admin give and /admin take add or remove a member's coins or ShadowBeans. The house is the
   other side, so coins never appear from nowhere or vanish. The member isn't told.
 """
@@ -15,6 +18,7 @@ from discord import app_commands
 from beans_bot.cogs.base import BeansCog, admin_only, requires_feature
 from beans_bot.services.coins import InsufficientFunds
 from beans_bot.services.errors import UserFacingError
+from beans_bot.services.markets import SECRET_BET_ANNOUNCEMENT
 
 # Discord's message length limit.
 MessageText = app_commands.Range[str, 1, 2000]
@@ -49,7 +53,7 @@ class ConfirmBotBet(discord.ui.View):
         thread = self.cog.bot.get_channel(self.thread_id)
         if isinstance(thread, discord.Thread):
             try:
-                await thread.send(f"I am joining the fray! I bet {amount} on {self.choice}!")
+                await thread.send(SECRET_BET_ANNOUNCEMENT)
             except discord.HTTPException:
                 self.cog.logger.warning(f"Could not announce the house bet in market {self.thread_id}")
 
@@ -136,6 +140,31 @@ class AdminCog(BeansCog):
         )
 
     botbet.autocomplete("choice")(_market_choice_autocomplete)
+
+    @admin.command(name="nullifybet", description="Undo a resolved prediction market: take back the payouts and refund every stake.")
+    @admin_only()
+    async def nullifybet(self, interaction: discord.Interaction):
+        if interaction.channel_id is None or not isinstance(interaction.channel, discord.Thread):
+            raise UserFacingError("Use this in the prediction market thread you want to erase from history.")
+        thread_id = interaction.channel_id
+        nullification = await self.services.markets.nullify(thread_id, interaction.user.id)
+        currency = self.services.currency
+        house = self.services.coins.house_user_id
+        lines = [
+            "The house has reviewed the tape. This market never happened. Winnings are confiscated, stakes are refunded, "
+            "and anyone who already spent their winnings now owes me. Debt builds character."
+        ]
+        for user_id, net in nullification.nets:
+            who = "The house" if user_id == house else f"<@{user_id}>"
+            if net < 0:
+                lines.append(f"- {who} gives back {currency.format(-net)}")
+            else:
+                lines.append(f"- {who} gets back {currency.format(net)}")
+        try:
+            await interaction.channel.send("\n".join(lines))
+        except discord.HTTPException:
+            self.logger.warning(f"Could not announce the nullified market {thread_id}")
+        await interaction.response.send_message("Nullified. The coins are back where they started, debts and all.", ephemeral=True)
 
     @admin.command(name="give", description="Give a member coins or ShadowBeans from the house. Only you see it.")
     @app_commands.describe(member="Who gets them", amount='How much, like "5" or "3 cheddar"', shadow="Give ShadowBeans instead of regular coins")
