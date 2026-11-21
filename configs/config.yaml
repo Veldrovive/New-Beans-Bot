@@ -23,6 +23,8 @@ gemini:
 classifier:
   enabled: true
   models_dir: models/classifier
+  corrections_dir: data/classifier_corrections
+  retrained_dir: data/classifier_models
   device: cpu
   torch_cpu_threads: 1
   hf_token: ${oc.env:HF_TOKEN,null}

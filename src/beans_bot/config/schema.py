@@ -44,6 +44,10 @@ class GeminiConfig(StrictModel):
 class ClassifierGlobalConfig(StrictModel):
     enabled: bool = True
     models_dir: Path = Path("models/classifier")
+    # Corrected photos are saved here as <model_path>/<label>/<image>. It's under data/ so it survives a rebuild.
+    corrections_dir: Path = Path("data/classifier_corrections")
+    # Models retrained by /admin retrain are saved here. One of these is used instead of the one in models_dir.
+    retrained_dir: Path = Path("data/classifier_models")
     device: str = "cpu"
     torch_cpu_threads: int = 1
     hf_token: SecretStr | None = None
@@ -178,6 +182,16 @@ class ClassifierScript(StrictModel):
     text: str  # May use {<model name>_label_<rank>}
 
 
+class ClassifierCorrectionsConfig(StrictModel):
+    """Puts buttons on each reply that let any member confirm the guess or say what the photo really shows."""
+
+    button_label: str = "Wrong?"
+    confirm_labels: list[str] = []  # Text for the confirm button. Each reply picks one.
+    confirmed_scripts: list[str] = []  # {confirmer}, {label}
+    corrected_scripts: list[str] = []  # {corrector}, {old_label}, {new_label}
+    new_label_scripts: list[str] = []  # {corrector}, {old_label}, {new_label}. A label the model doesn't know yet.
+
+
 class ClassifierModelConfig(StrictModel):
     model_path: str  # Relative to classifier.models_dir
     auto_respond_channels: list[int] = []
@@ -185,6 +199,7 @@ class ClassifierModelConfig(StrictModel):
     confidence_thresholds: dict[str, float]
     select_random_prob: float = 0.0  # Otherwise pick the least recently used script
     scripts: list[ClassifierScript]
+    corrections: ClassifierCorrectionsConfig | None = None  # Missing means guesses can't be corrected
 
 
 class ClassifierGuildConfig(StrictModel):

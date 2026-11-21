@@ -207,6 +207,27 @@ guilds:
             label: ANY
             confidence: LOW
             text: Who is this man? {cats_label_1}?
+          corrections:
+            button_label: Wrong cat?
+            confirm_labels:  # Each reply picks one
+            - Yep, that's the one
+            - Correct. Good bot.
+            - That's them alright
+            - Nailed it
+            confirmed_scripts:  # {confirmer}, {label}
+            - "{confirmer} confirms it: {label}. I never doubted myself."
+            - "Verified by {confirmer}. {label} it is. Hold your applause."
+            - "{confirmer} agrees this is {label}. Two geniuses, one cat."
+            - "{label}, as certified by {confirmer}. Another flawless performance."
+            corrected_scripts:  # {corrector}, {old_label}, {new_label}
+            - "{corrector} says this is {new_label}, not {old_label}. I have been humbled."
+            - "Correction from {corrector}: that's {new_label}. All cats look like {old_label} to me."
+            - "{corrector} has filed a complaint. It was {new_label} all along. {old_label} is cleared of all charges."
+            - "My apologies to {new_label}, who {corrector} tells me is not {old_label}."
+            new_label_scripts:  # {corrector}, {old_label}, {new_label}
+            - "{corrector} says this is {new_label}, a cat I have never met. I guessed {old_label} out of politeness."
+            - "A new challenger appears! {corrector} introduces {new_label}. Not {old_label}, apparently."
+            - "{corrector} claims there is a cat called {new_label}. I'll believe it when I'm retrained."
         emotions:
           model_path: emotions
           auto_respond_channels:

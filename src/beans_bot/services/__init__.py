@@ -8,6 +8,7 @@ from beans_bot.config.schema import BotConfig
 from beans_bot.currency import CurrencySystem
 from beans_bot.db.engine import Database
 from beans_bot.services.auto_bets import AutoBetService
+from beans_bot.services.classifier import ClassifierService
 from beans_bot.services.coins import CoinService
 from beans_bot.services.council import CouncilService
 from beans_bot.services.gemini import GeminiService
@@ -33,6 +34,7 @@ class Services:
     snipes: SnipeService
     manifesto: ManifestoService
     heists: HeistService
+    classifier: ClassifierService
     gemini: GeminiService
 
     @classmethod
@@ -55,5 +57,6 @@ class Services:
             snipes=SnipeService(db),
             manifesto=ManifestoService(config, db, vip),
             heists=HeistService(db, coins, vip),
+            classifier=ClassifierService(db, config.classifier.corrections_dir),
             gemini=GeminiService(config.gemini),
         )

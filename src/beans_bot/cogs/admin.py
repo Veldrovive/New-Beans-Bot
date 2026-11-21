@@ -8,14 +8,20 @@ Admin tools, for server admins. Every reply here is ephemeral, so nobody sees wh
   spent) and every stake is refunded. The thread hears about it, but not who did it.
 - /admin give and /admin take add or remove a member's coins or ShadowBeans. The house is the
   other side, so coins never appear from nowhere or vanish. The member isn't told.
+- /admin retrain retrains the image classifier on the photos members have confirmed and corrected.
+  It runs in the background and reports back when it's done.
 """
 
 from __future__ import annotations
+
+import asyncio
+from collections.abc import Awaitable
 
 import discord
 from discord import app_commands
 
 from beans_bot.cogs.base import BeansCog, admin_only, requires_feature
+from beans_bot.services.classifier import RetrainFailed, RetrainInProgress, RetrainResult
 from beans_bot.services.coins import InsufficientFunds
 from beans_bot.services.errors import UserFacingError
 from beans_bot.services.markets import SECRET_BET_ANNOUNCEMENT
@@ -71,6 +77,9 @@ class AdminCog(BeansCog):
         guild_only=True,
         default_permissions=discord.Permissions(administrator=True),
     )
+
+    async def cog_load(self):
+        self.retrain_tasks: set[asyncio.Task[None]] = set()
 
     @admin.command(name="sync", description="Re-sync slash commands with Discord.")
     @admin_only()
@@ -165,6 +174,47 @@ class AdminCog(BeansCog):
         except discord.HTTPException:
             self.logger.warning(f"Could not announce the nullified market {thread_id}")
         await interaction.response.send_message("Nullified. The coins are back where they started, debts and all.", ephemeral=True)
+
+    @admin.command(name="retrain", description="Retrain the image classifier on the photos members confirmed and corrected.")
+    @admin_only()
+    @requires_feature("classifier")
+    async def retrain(self, interaction: discord.Interaction):
+        assert interaction.guild_id is not None
+        retrainer = self.services.classifier.retrainer
+        if retrainer is None:
+            raise UserFacingError("The classifier isn't running on this bot, so there's no brain here to retrain.")
+        await interaction.response.send_message(
+            "Fine, back to school. I'll keep guessing with my old brain while I study, and tell you here when the new one is in.", ephemeral=True
+        )
+        # Keep a reference, or the task can be garbage collected before it finishes.
+        task = asyncio.create_task(self._retrain(interaction, retrainer(interaction.guild_id)))
+        self.retrain_tasks.add(task)
+        task.add_done_callback(self.retrain_tasks.discard)
+
+    async def _retrain(self, interaction: discord.Interaction, retraining: Awaitable[list[RetrainResult]]) -> None:
+        """Waits for a retrain and tells the admin how it went."""
+        try:
+            results = await retraining
+        except RetrainInProgress:
+            report = "I'm already mid-lesson. One education at a time."
+        except RetrainFailed as e:
+            report = str(e)
+        except Exception:
+            self.logger.exception(f"Retrain failed in guild {interaction.guild_id}")
+            report = "I studied so hard that something broke. My brain is unchanged. The logs know why."
+        else:
+            lines = ["Class dismissed. I'm guessing with the new brain now."]
+            for result in results:
+                unreadable = f", {result.skipped} I couldn't read" if result.skipped else ""
+                counts = ", ".join(f"{label} {count}" for label, count in result.counts.items())
+                lines.append(f"- **{result.name}**: {sum(result.counts.values())} photos, {result.added} of them from members{unreadable}")
+                lines.append(f"-# {counts}")
+            report = "\n".join(lines)[:2000]
+        try:
+            await interaction.followup.send(report, ephemeral=True)
+        except discord.HTTPException:
+            # The interaction expires after 15 minutes. The result is in the log either way.
+            self.logger.warning(f"Could not report the retrain in guild {interaction.guild_id}")
 
     @admin.command(name="give", description="Give a member coins or ShadowBeans from the house. Only you see it.")
     @app_commands.describe(member="Who gets them", amount='How much, like "5" or "3 cheddar"', shadow="Give ShadowBeans instead of regular coins")

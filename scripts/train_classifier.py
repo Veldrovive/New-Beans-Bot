@@ -16,6 +16,10 @@ Embeddings are cached by file hash in <models-dir>/cache/embeddings.pkl, so
 retraining only embeds new images. Each dataset produces <models-dir>/<dataset_name>.pkl
 and <dataset_name>_labels.pkl, plus a confusion matrix and annotated test images
 in <models-dir>/test_output/<dataset_name>.
+
+It also writes <dataset_name>_training.pkl: the embeddings the model was trained on. The bot's
+/admin retrain starts from that file, because the photos themselves aren't on the server. Commit it
+with the model.
 """
 
 import argparse
@@ -34,6 +38,7 @@ from pillow_heif import register_heif_opener
 from sklearn.metrics import ConfusionMatrixDisplay, accuracy_score, confusion_matrix, log_loss
 
 from beans_bot.cogs.classifier.dino import Classifier, DinoFeatureExtractor
+from beans_bot.cogs.classifier.training import TrainingSet, save_training_set
 
 register_heif_opener()
 
@@ -125,6 +130,8 @@ def main() -> None:
         classifier = Classifier()
         classifier.train(X_train, y_train, {label: i for i, label in enumerate(labels)})
         classifier.save(args.models_dir / dataset.name)
+        training_set = TrainingSet(X=X_train, labels=[labels[index] for _, index in train], hashes=[file_hash(path) for path, _ in train])
+        save_training_set(args.models_dir / dataset.name, training_set)
 
         print(f"\n--- Testing {dataset.name} ---")
         output_dir = args.models_dir / "test_output" / dataset.name

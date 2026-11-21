@@ -121,7 +121,7 @@ guilds:
     auto_bets:
       bets_file: auto_bets/prod.json
       post_time: "09:00"  # In `timezone`
-      post_probability: 0.0
+      post_probability: 0.25
       intro_scripts:  # {bet}
       - "{bet}"
     birthday:
@@ -221,6 +221,25 @@ guilds:
             label: ANY
             confidence: LOW
             text: Who is this man? {cats_label_1}?
+          corrections:
+            button_label: Wrong cat?
+            confirm_labels:  # Each reply picks one
+            - "Correct. Good bot."
+            - "That's them alright"
+            - "Hell yeah! that's the guy!"
+            confirmed_scripts:  # {confirmer}, {label}
+            - "It was never in doubt I was correct."
+            - "Another flawless performance by the bot."
+            - "Mwahaha, I knew it to be true!"
+            corrected_scripts:  # {corrector}, {old_label}, {new_label}
+            - "I still think I was right, but apparently this is {new_label}"
+            - "Fine, I guess this is {new_label}."
+            - "If you insist this is {new_label}, then I suppose I will concede."
+            new_label_scripts:  # {corrector}, {old_label}, {new_label}
+            - "New cat alert?! This is {new_label}!"
+            - "Holy guacamole! {new_label} has hit the market."
+            - "The cat distribution system has endowed us with {new_label}."
+            - "{new_label} before GTA 6?!?!"
         emotions:
           model_path: emotions
           auto_respond_channels:

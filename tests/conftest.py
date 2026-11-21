@@ -3,6 +3,7 @@ import pytest
 from beans_bot.currency import CurrencySystem
 from beans_bot.db.engine import Database
 from beans_bot.services.auto_bets import AutoBetService
+from beans_bot.services.classifier import ClassifierService
 from beans_bot.services.coins import CoinService
 from beans_bot.services.heists import HeistService
 from beans_bot.services.jail import JailService
@@ -56,3 +57,8 @@ def auto_bets(db, coins):
 @pytest.fixture
 def heists(db, coins, vip):
     return HeistService(db, coins, vip)
+
+
+@pytest.fixture
+def classifier(db, tmp_path):
+    return ClassifierService(db, tmp_path / "corrections")
