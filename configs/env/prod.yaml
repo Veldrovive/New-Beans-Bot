@@ -121,7 +121,7 @@ guilds:
     auto_bets:
       bets_file: auto_bets/prod.json
       post_time: "09:00"  # In `timezone`
-      post_probability: 0.25
+      post_probability: 0.0  # Never post auto bets
       intro_scripts:  # {bet}
       - "{bet}"
     birthday:
