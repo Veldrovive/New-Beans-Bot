@@ -2,6 +2,9 @@
 services:
   bot:
     build: .
+    # The admin website. Published on the host's localhost only: Cloudflare Access (or an SSH tunnel) is the way in.
+    ports:
+      - "127.0.0.1:8377:8377"
     volumes:
       - ./data:/app/data          # beans.db lives here
       - ./configs:/app/configs    # Edit guild config without rebuilding
@@ -13,6 +16,7 @@ services:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODEL=${GEMINI_MODEL}
       - GEMINI_THINKING_LEVEL=${GEMINI_THINKING_LEVEL}
+      - WEB_HOST=0.0.0.0  # Inside the container the website must listen on every interface; `ports` keeps it on localhost
     restart: unless-stopped
 
 volumes:

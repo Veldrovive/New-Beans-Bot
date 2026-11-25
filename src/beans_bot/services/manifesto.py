@@ -8,6 +8,7 @@ Manifestos: members write one, and the bot quotes the wisdom in it.
   The 1% can also add wisdom to anyone else's. It's still that member's to edit or remove.
   Added wisdom lives in the database and comes after the wisdom.json lines. Members can edit or
   remove what they added, but the wisdom.json lines are written in stone.
+- The admin site can add, edit and remove added wisdom on anyone's behalf.
 - Wisdom is numbered from 1. Leave out the member or the number and one is picked at random:
   first a manifesto, each equally likely, then a line within it.
 """
@@ -15,6 +16,7 @@ Manifestos: members write one, and the bot quotes the wisdom in it.
 from __future__ import annotations
 
 import dataclasses
+import datetime
 import json
 import logging
 import random
@@ -67,6 +69,8 @@ class Line:
     text: str
     added_by: int | None = None  # Who added it with /manifesto add. None for wisdom.json lines.
     added_id: int | None = None  # Its ManifestoWisdom row
+    added_at: datetime.datetime | None = None
+    edited_at: datetime.datetime | None = None
 
 
 @dataclass
@@ -128,7 +132,9 @@ class ManifestoService:
         for row in rows.all():
             # Added wisdom joins the member's folder manifesto if they have one, else their own
             manifesto = by_key.setdefault(authors.get(row.author_user_id, row.author_user_id), Manifesto(author_ids=[row.author_user_id]))
-            manifesto.lines.append(Line(row.text, added_by=row.author_user_id, added_id=row.id))
+            manifesto.lines.append(
+                Line(row.text, added_by=row.author_user_id, added_id=row.id, added_at=row.created_at, edited_at=row.edited_at)
+            )
         return list(by_key.values())
 
     async def _of(self, session: AsyncSession, guild_id: int | None, user_id: int) -> Manifesto:

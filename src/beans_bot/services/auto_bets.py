@@ -8,17 +8,20 @@ Automatic bets: prediction markets the bot posts by itself, from a JSON file of 
 - Bets are used up a round at a time: a bet isn't picked again until every bet in the
   file has been posted, then the next round starts from the full list.
 - A bet is identified by its template text, so rewording a template makes it a new bet.
+- The admin site can post one right away, through the `poster` hook the cog registers.
 """
 
 from __future__ import annotations
 
 import datetime
 import logging
+from collections.abc import Awaitable, Callable
 import random
 import string
 from dataclasses import dataclass
 from pathlib import Path
 
+import discord
 from pydantic import Field, TypeAdapter, field_validator, model_validator
 from sqlmodel import col, func, select
 
@@ -121,6 +124,8 @@ class AutoBetService:
     def __init__(self, db: Database, currency: CurrencySystem):
         self.db = db
         self.currency = currency
+        # Posts a bet now. Needs Discord, so the auto bets cog registers it here while it's loaded.
+        self.poster: Callable[[discord.Guild], Awaitable[discord.Thread]] | None = None
 
     async def draw(self, guild_id: int, bets: list[AutoBet]) -> Draw:
         """Pick a bet nobody has seen this round, and fill it in. Starts a new round when they're all used up."""

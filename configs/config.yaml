@@ -23,11 +23,21 @@ gemini:
 classifier:
   enabled: true
   models_dir: models/classifier
-  corrections_dir: data/classifier_corrections
+  datasets_dir: data/classifier_datasets  # The photos and their train/val split, managed on the website
+  val_fraction: 0.2
+  corrections_dir: data/classifier_corrections  # Old corrections, for scripts/import_classifier_dataset.py
   retrained_dir: data/classifier_models
   device: cpu
   torch_cpu_threads: 1
   hf_token: ${oc.env:HF_TOKEN,null}
+
+web:
+  enabled: true
+  host: ${oc.env:WEB_HOST,127.0.0.1}  # Docker sets WEB_HOST=0.0.0.0; the compose file keeps the port on localhost
+  port: 8377
+  # The Discord user ID recorded as the actor on coins given or taken from the website.
+  # Aidan (the Dempseram council member). If it's null, give, take and nullify on the website refuse with a 400.
+  actor_user_id: 728600387501686836
 
 hydra:
   run:

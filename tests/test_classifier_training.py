@@ -1,6 +1,7 @@
-"""Retraining, with a fake feature extractor so no model has to be downloaded."""
+"""Retraining and scoring, with a fake feature extractor so no model has to be downloaded."""
 
 import io
+import pickle
 
 import pytest
 
@@ -10,13 +11,14 @@ import numpy as np
 from PIL import Image
 
 from beans_bot.cogs.classifier.dino import Classifier
-from beans_bot.cogs.classifier.training import TrainingSet, load_training_set, retrain, save_training_set
+from beans_bot.cogs.classifier.training import TrainingImage, TrainingSet, load_training_set, save_training_set, train_and_evaluate
+from beans_bot.services.classifier import RetrainFailed
 
 RED, GREEN, BLUE = (255, 0, 0), (0, 255, 0), (0, 0, 255)
 
 
 class ColorExtractor:
-    """Embeds an image as its average color."""
+    """Embeds an image as its average color, shaped (1, 3) like the real one."""
 
     def __init__(self):
         self.calls = 0
@@ -26,86 +28,123 @@ class ColorExtractor:
         return np.asarray(images, dtype=np.float32).mean(axis=(0, 1))[None, :]
 
 
-def png(color, size=4) -> bytes:
-    buffer = io.BytesIO()
-    Image.new("RGB", (size, size), color).save(buffer, format="PNG")
-    return buffer.getvalue()
+class Photos:
+    """Writes photos to disk and describes them the way the cog does."""
+
+    def __init__(self, root):
+        self.root = root
+        self.images: list[TrainingImage] = []
+
+    def add(self, color, label, split="train", data=None) -> TrainingImage:
+        n = len(self.images) + 1
+        path = self.root / f"{n}.png"
+        if data is None:
+            buffer = io.BytesIO()
+            Image.new("RGB", (4, 4), color).save(buffer, format="PNG")
+            data = buffer.getvalue()
+        path.write_bytes(data)
+        image = TrainingImage(id=n, path=path, label=label, split=split, content_hash=f"hash{n}")
+        self.images.append(image)
+        return image
+
+    def several(self, color, label, count, split="train"):
+        for i in range(count):
+            self.add(tuple(min(255, c + i) for c in color), label, split)
 
 
-def near(color, n=6):
-    return [[c + i for c in color] for i in range(n)]
+@pytest.fixture
+def photos(tmp_path):
+    (tmp_path / "photos").mkdir()
+    return Photos(tmp_path / "photos")
 
 
 @pytest.fixture
 def paths(tmp_path):
-    """A shipped model that knows red and green cats."""
-    base = tmp_path / "models" / "cats"
-    base.parent.mkdir()
-    X = np.array(near(RED) + near(GREEN), dtype=np.float32)
-    save_training_set(base, TrainingSet(X=X, labels=["red"] * 6 + ["green"] * 6, hashes=[f"h{i}" for i in range(12)]))
-    return base, tmp_path / "corrections" / "cats", tmp_path / "retrained" / "cats", tmp_path / "retrained" / "embeddings.pkl"
-
-
-def save(corrections, label, name, data):
-    (corrections / label).mkdir(parents=True, exist_ok=True)
-    (corrections / label / name).write_bytes(data)
+    return tmp_path / "retrained" / "cats", tmp_path / "datasets" / "embeddings.pkl"
 
 
 def predict(classifier, color) -> str:
     return classifier.index_to_label[int(classifier.predict(np.array([color], dtype=np.float32))[0])]
 
 
-def test_training_set_round_trips(paths):
-    training_set = load_training_set(paths[0])
-    assert training_set.X.shape == (12, 3) and training_set.labels[0] == "red" and training_set.hashes[-1] == "h11"
+def test_training_set_round_trips(tmp_path):
+    # Still used by scripts/train_classifier.py.
+    save_training_set(tmp_path / "cats", TrainingSet(X=np.zeros((2, 3)), labels=["a", "b"], hashes=["h1", "h2"]))
+    assert load_training_set(tmp_path / "cats").labels == ["a", "b"]
 
 
-def test_retrain_learns_a_new_cat_from_saved_photos(paths):
-    base, corrections, output, cache = paths
-    for i in range(3):
-        save(corrections, "blue", f"50{i}_1.png", png((0, 0, 250 + i)))
-    save(corrections, "red", "600_1.png", png((250, 0, 0)))
-    save(corrections, "red", ".DS_Store", b"finder litter")
+def test_learns_a_new_label_and_saves_the_model(photos, paths):
+    photos.several(RED, "red", 6)
+    photos.several(GREEN, "green", 6)
+    photos.several(BLUE, "blue", 3)
+    output, cache = paths
+    progress = []
+    classifier, results = train_and_evaluate(ColorExtractor(), photos.images, output, cache, lambda done, total: progress.append((done, total)))
 
-    classifier, result = retrain("cats", ColorExtractor(), base, corrections, output, cache)
-
-    assert result.name == "cats" and (result.added, result.skipped) == (4, 0)
-    assert result.counts == {"blue": 3, "green": 6, "red": 7}
     assert [predict(classifier, c) for c in (RED, GREEN, BLUE)] == ["red", "green", "blue"]
-    # The saved model is what the bot loads after a restart. The shipped one is untouched.
+    assert (results.train_count, results.val_count, results.accuracy, results.log_loss) == (15, 0, None, None)
+    assert results.results["labels"] == ["blue", "green", "red"]
+    assert progress[-1] == (15, 15) and len(progress) == 15
     loaded = Classifier()
     loaded.load(output)
     assert predict(loaded, BLUE) == "blue"
-    assert not (base.parent / "cats.pkl").exists()
 
 
-def test_retrain_with_no_saved_photos_rebuilds_the_shipped_model(paths):
-    base, corrections, output, cache = paths
-    classifier, result = retrain("cats", ColorExtractor(), base, corrections, output, cache)
-    assert result.counts == {"green": 6, "red": 6} and result.added == 0
-    assert predict(classifier, RED) == "red"
+def test_scores_a_known_val_set_exactly(photos, paths):
+    photos.several(RED, "red", 6)
+    photos.several(GREEN, "green", 6)
+    photos.add(RED, "red", "val")
+    photos.add(GREEN, "green", "val")
+    wrong = photos.add(GREEN, "red", "val")  # Labeled red, but it's green: the model will say green
+    _, results = train_and_evaluate(ColorExtractor(), photos.images, *paths)
+
+    assert (results.train_count, results.val_count) == (12, 3)
+    assert results.accuracy == pytest.approx(2 / 3)
+    assert results.log_loss is not None and results.log_loss > 0
+    r = results.results
+    assert r["labels"] == ["green", "red"]
+    assert r["confusion"] == [[1, 0], [1, 1]]  # Rows are the truth, columns the guess
+    assert r["per_label"]["green"] == {"train": 6, "val": 1, "precision": 0.5, "recall": 1.0}
+    assert r["per_label"]["red"] == {"train": 6, "val": 2, "precision": 1.0, "recall": 0.5}
+    mistake = next(p for p in r["predictions"] if not p["correct"])
+    assert (mistake["image_id"], mistake["label"], mistake["predicted"]) == (wrong.id, "red", "green")
+    assert set(mistake["probabilities"]) == {"green", "red"} and mistake["probabilities"]["green"] > 0.5
 
 
-def test_retrain_skips_unreadable_and_duplicate_photos(paths):
-    base, corrections, output, cache = paths
-    save(corrections, "blue", "1_1.png", png(BLUE))
-    save(corrections, "blue", "2_1.png", png(BLUE))  # The same photo posted twice
-    save(corrections, "blue", "3_1.png", b"not an image")
-    _, result = retrain("cats", ColorExtractor(), base, corrections, output, cache)
-    assert (result.added, result.skipped, result.counts["blue"]) == (1, 1, 1)
+def test_skips_unreadable_photos(photos, paths):
+    photos.several(RED, "red", 3)
+    photos.several(GREEN, "green", 3)
+    broken = photos.add(None, "red", data=b"not an image")
+    _, results = train_and_evaluate(ColorExtractor(), photos.images, *paths)
+    assert results.results["skipped"] == [broken.id] and results.train_count == 6
 
 
-def test_retrain_only_embeds_new_photos(paths):
-    base, corrections, output, cache = paths
+def test_only_embeds_new_photos_and_caches_flat_vectors(photos, paths):
+    photos.several(RED, "red", 3)
+    photos.several(GREEN, "green", 3)
     extractor = ColorExtractor()
-    save(corrections, "blue", "1_1.png", png(BLUE))
-    retrain("cats", extractor, base, corrections, output, cache)
-    save(corrections, "blue", "2_1.png", png((0, 0, 200)))
-    retrain("cats", extractor, base, corrections, output, cache)
-    assert extractor.calls == 2
+    train_and_evaluate(extractor, photos.images, *paths)
+    photos.add(BLUE, "red")
+    train_and_evaluate(extractor, photos.images, *paths)
+    assert extractor.calls == 7
+    cache = pickle.loads(paths[1].read_bytes())
+    assert len(cache) == 7 and all(v.shape == (3,) for v in cache.values())
 
 
-def test_retrain_needs_the_shipped_training_set(tmp_path):
-    with pytest.raises(FileNotFoundError):
-        retrain("cats", ColorExtractor(), tmp_path / "cats", tmp_path / "c", tmp_path / "out" / "cats", tmp_path / "out" / "e.pkl")
-    assert not (tmp_path / "out").exists()
+def test_needs_two_labels(photos, paths):
+    photos.several(RED, "red", 3)
+    photos.several(GREEN, "green", 2, split="val")
+    with pytest.raises(RetrainFailed):
+        train_and_evaluate(ColorExtractor(), photos.images, *paths)
+    assert not paths[0].parent.exists()
+
+
+def test_val_only_labels_are_reported_not_scored(photos, paths):
+    photos.several(RED, "red", 4)
+    photos.several(GREEN, "green", 4)
+    photos.add(RED, "red", "val")
+    photos.add(BLUE, "blue", "val")  # Nobody taught it blue
+    _, results = train_and_evaluate(ColorExtractor(), photos.images, *paths)
+    assert results.results["unseen_val_labels"] == ["blue"]
+    assert (results.val_count, results.accuracy) == (1, 1.0)
+    assert "blue" not in results.results["labels"]

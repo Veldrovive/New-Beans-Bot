@@ -7,3 +7,5 @@ outputs/
 models/classifier/cache/
 models/classifier/datasets/
 **/__pycache__
+frontend/node_modules
+frontend/dist

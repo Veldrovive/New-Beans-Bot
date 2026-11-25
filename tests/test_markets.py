@@ -364,3 +364,13 @@ async def test_nullify_needs_a_resolved_market_with_payouts(markets, coins, db, 
     assert await coins.balance(GUILD, 1) == 100
     stored = await markets.get(THREAD)
     assert stored is not None and stored.status == MarketStatus.RESOLVED
+
+
+def test_nullification_announcement_names_debtors_but_not_the_admin():
+    from beans_bot.currency import CurrencySystem
+    from beans_bot.services.markets import Nullification, nullification_announcement
+
+    text = nullification_announcement(Nullification(nets=[(1, -500), (2, 100), (HOUSE, 400)]), CurrencySystem(), HOUSE)
+    lines = text.splitlines()
+    assert lines[0].startswith("The house has reviewed the tape.")
+    assert lines[1:] == ["- <@1> gives back 5 BeanCoins", "- <@2> gets back 1 BeanCoin", "- The house gets back 4 BeanCoins"]

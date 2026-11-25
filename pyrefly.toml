@@ -36,8 +36,10 @@ python-interpreter-path = ".venv/bin/python"
 
 # wildcards for which Pyrefly will unconditionally replace the import with `typing.Any`
 replace-imports-with-any = []
-# wildcards for which Pyrefly will replace the import with `typing.Any` if it can't be found
-ignore-missing-imports = []
+# wildcards for which Pyrefly will replace the import with `typing.Any` if it can't be found.
+# These come only with the `classifier` extra, so a checkout without it still type-checks clean.
+# With the extra installed they're found and checked as usual.
+ignore-missing-imports = ["torch", "torch.*", "numpy", "numpy.*", "sklearn.*", "transformers", "huggingface_hub", "cv2", "matplotlib.*", "tqdm"]
 # wildcards for which Pyrefly will replace untyped third-party imports with `typing.Any`
 replace-untyped-imports-with-any = []
 # should Pyrefly skip type checking if we find a generated file?

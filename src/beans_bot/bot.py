@@ -83,6 +83,11 @@ class BeansBot(commands.Bot):
 
             await self.add_cog(ClassifierCog(self))
 
+        # Last, so every cog has registered its hooks before the website takes requests.
+        from beans_bot.cogs.web import WebCog
+
+        await self.add_cog(WebCog(self))
+
         if self.config.sync_commands_on_startup:
             synced = await self.tree.sync()
             logger.info(f"Synced {len(synced)} application commands")

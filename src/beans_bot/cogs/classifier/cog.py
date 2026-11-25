@@ -5,12 +5,12 @@ channels, or anywhere when someone reacts with the model's trigger emoji.
 
 - Models with a `corrections` section get two buttons under each reply. Any member can confirm the
   guess, or pick what the photo really shows. The picker can also add a name the model doesn't know.
-- The verdict is noted on the reply, and the photo is saved to disk under the right label so the
-  model can be retrained on it. See services/classifier.py.
+- The verdict is noted on the reply, and the photo joins the model's dataset under the right label so
+  the model can be retrained on it. See services/classifier.py.
 - Once someone has decided, the buttons go away. Anyone can still overrule the decision from the
   message's menu: Apps > Override the guess, on the photo or on the bot's reply.
-- /admin retrain rebuilds those models from their original training set plus the saved photos, in a
-  background thread, and swaps the new model in when it's done. See training.py.
+- A retrain (from /admin retrain or the website) trains a dataset's model on its train photos, scores it
+  on its val photos and records both, in a background thread, then swaps the new model in. See training.py.
 """
 
 from __future__ import annotations
@@ -38,7 +38,8 @@ from beans_bot.config.schema import ClassifierModelConfig
 from beans_bot.db.models import ClassifierProcessedMessage, ClassifierScriptLastUsed
 from beans_bot.db.types import utcnow
 from beans_bot.services import emoji, scripts
-from beans_bot.services.classifier import AlreadyLabeled, InvalidLabel, NotClassified, RetrainFailed, RetrainInProgress, RetrainResult, UnknownLabel
+from beans_bot.db.models import ClassifierTrainingRun
+from beans_bot.services.classifier import AlreadyLabeled, InvalidLabel, NotClassified, RetrainFailed, RetrainInProgress, UnknownLabel
 
 EMBEDDING_CACHE_SIZE = 100
 NEVER = datetime.datetime.min.replace(tzinfo=datetime.UTC)
@@ -155,6 +156,7 @@ class ClassifierCog(BeansCog):
             DinoFeatureExtractor, device=global_config.device, hf_token=hf_token
         )
         self.classifiers: dict[str, Classifier] = {}
+        self.model_sources: dict[str, str] = {}  # "retrained" or "shipped"
         model_paths = {
             model.model_path
             for guild in self.config.guilds.values()
@@ -169,6 +171,7 @@ class ClassifierCog(BeansCog):
                 classifier = Classifier()
                 classifier.load(base_path)
                 self.classifiers[model_path] = classifier
+                self.model_sources[model_path] = "retrained" if base_path == retrained else "shipped"
                 self.logger.info(f"Loaded classifier {model_path} from {base_path}")
             except Exception as e:
                 self.logger.error(f"Failed to load classifier {model_path}: {e}")
@@ -176,12 +179,17 @@ class ClassifierCog(BeansCog):
         ConfirmButton.cog = CorrectButton.cog = self
         self.bot.add_dynamic_items(ConfirmButton, CorrectButton)
         self.retrain_lock = asyncio.Lock()
+        stale = await self.services.classifier.fail_stale_runs()
+        if stale:
+            self.logger.warning(f"Marked {stale} retrain(s) interrupted by a restart as failed")
         self.services.classifier.retrainer = self.retrain
+        self.services.classifier.model_info = self.model_info
         self.bot.tree.add_command(self.override_menu)
 
     async def cog_unload(self):
         self.bot.tree.remove_command(self.override_menu.name, type=self.override_menu.type)
         self.services.classifier.retrainer = None
+        self.services.classifier.model_info = None
         self.bot.remove_dynamic_items(ConfirmButton, CorrectButton)
         ConfirmButton.cog = CorrectButton.cog = None
 
@@ -334,7 +342,7 @@ class ClassifierCog(BeansCog):
         if model is None or model.corrections is None or classifier is None or interaction.message is None:
             await interaction.response.send_message(NO_CORRECTIONS, ephemeral=True)
             return
-        labels = self.services.classifier.known_labels(model.model_path, list(classifier.index_to_label.values()))
+        labels = await self.services.classifier.known_labels(model.model_path, list(classifier.index_to_label.values()))
         await interaction.response.send_message("Fine. Enlighten me.", view=CorrectionPicker(self, name, interaction.message, labels), ephemeral=True)
 
     async def override_guess(self, interaction: discord.Interaction, message: discord.Message) -> None:
@@ -364,7 +372,7 @@ class ClassifierCog(BeansCog):
                 "There's no guess of mine here to overrule. Try it on one of my cat guesses, if you must.", ephemeral=True
             )
             return
-        labels = self.services.classifier.known_labels(models[guess.classifier_name].model_path, list(classifier.index_to_label.values()))
+        labels = await self.services.classifier.known_labels(models[guess.classifier_name].model_path, list(classifier.index_to_label.values()))
         picker = CorrectionPicker(self, guess.classifier_name, reply, labels)
         await interaction.response.send_message("Overruling the record, are we? Go on then.", view=picker, ephemeral=True)
 
@@ -453,37 +461,56 @@ class ClassifierCog(BeansCog):
 
     # --- Retraining ----------------------------------------------------------------------
 
-    async def retrain(self, guild_id: int) -> list[RetrainResult]:
+    def model_info(self, dataset: str) -> dict:
+        """What the bot is using for a dataset: whether a model is loaded, where it came from, and its labels."""
+        classifier = self.classifiers.get(dataset)
+        return {
+            "loaded": classifier is not None,
+            "source": self.model_sources.get(dataset),
+            "labels": list(classifier.index_to_label.values()) if classifier is not None else [],
+        }
+
+    async def retrain(self, dataset: str, triggered_by: str) -> ClassifierTrainingRun:
         """
-        Retrains every model in the guild that takes corrections, and starts using the new ones.
-        The work happens in a thread, so the bot keeps answering (and guessing) meanwhile.
+        Retrains one dataset's model on its train photos, scores it on its val photos, and starts using it.
+        The work happens in a thread, so the bot keeps answering (and guessing) meanwhile. One at a time.
         """
         if self.retrain_lock.locked():
             raise RetrainInProgress()
         async with self.retrain_lock:
-            global_config = self.config.classifier
-            models = {name: model for name, model in self.models_for(guild_id).items() if model.corrections is not None}
-            if not models:
-                raise RetrainFailed("No model here takes corrections, so I have nothing new to learn.")
-            results = []
-            for name, model in models.items():
-                try:
-                    classifier, result = await asyncio.to_thread(
-                        training.retrain,
-                        name,
-                        self.feature_extractor,
-                        global_config.models_dir / model.model_path,
-                        global_config.corrections_dir / model.model_path,
-                        self.retrained_path(model.model_path),
-                        global_config.retrained_dir / "embeddings.pkl",
-                    )
-                except FileNotFoundError as e:
-                    self.logger.exception(f"No training set for {name}")
-                    raise RetrainFailed(
-                        f"I can't find my old homework for {name} (`{model.model_path}_training.pkl`). "
-                        "Run `scripts/train_classifier.py` once and redeploy me."
-                    ) from e
-                self.classifiers[model.model_path] = classifier
-                self.logger.info(f"Guild {guild_id}: retrained {name} on {sum(result.counts.values())} photos ({result.added} from members)")
-                results.append(result)
-            return results
+            service = self.services.classifier
+            run = await service.start_run(dataset, triggered_by)
+            assert run.id is not None
+            try:
+                rows = await service.training_images(dataset)
+                if not rows:
+                    raise RetrainFailed(f"No photos have been imported for {dataset} yet. Run scripts/import_classifier_dataset.py.")
+                images = [
+                    training.TrainingImage(id=row.id or 0, path=service.image_path(row), label=row.label, split=row.split, content_hash=row.content_hash)
+                    for row in rows
+                ]
+                service.progress[dataset] = (0, len(images))
+
+                def progress(done: int, total: int) -> None:
+                    service.progress[dataset] = (done, total)  # A plain dict write is safe from the thread
+
+                classifier, results = await asyncio.to_thread(
+                    training.train_and_evaluate, self.feature_extractor, images, self.retrained_path(dataset), service.cache_path, progress
+                )
+                self.classifiers[dataset] = classifier
+                self.model_sources[dataset] = "retrained"
+                finished = await service.finish_run(
+                    run.id,
+                    train_count=results.train_count,
+                    val_count=results.val_count,
+                    accuracy=results.accuracy,
+                    log_loss=results.log_loss,
+                    results=results.results,
+                )
+            except Exception as e:
+                await service.fail_run(run.id, str(e)[:500] if isinstance(e, RetrainFailed) else f"{type(e).__name__}: {e}"[:500])
+                raise
+            finally:
+                service.progress.pop(dataset, None)
+            self.logger.info(f"Retrained {dataset} on {results.train_count} photos, val accuracy {results.accuracy}")
+            return finished

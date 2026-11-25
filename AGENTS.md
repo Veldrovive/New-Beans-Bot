@@ -16,9 +16,12 @@ uv run pytest                # fast (~2s), no Discord connection needed
 uv run pyrefly check         # type check. Must report 0 errors.
 uv run alembic revision --autogenerate -m "describe the change"
 uv run scripts/run_bot.py    # needs a real BOT_TOKEN in .env. Don't run it unless asked.
+uv run scripts/run_web.py db_path=<a copy of a db>   # the website's API without Discord. Never data/beans.db.
+(cd frontend && npm run build)   # the website's pages. Must pass.
+uv run scripts/export_openapi.py && (cd frontend && npm run gen:api)   # after changing any endpoint or response model
 ```
 
-Run both `pytest` and `pyrefly check` before calling anything done. Typing habits that keep pyrefly clean:
+Run `pytest`, `pyrefly check` and `npm run build` (in `frontend/`) before calling anything done. Typing habits that keep pyrefly clean:
 
 - Wrap model columns in `col()` inside `update(...).where(...)` and `.group_by(...)`. Plain `Model.field == x` types as `bool` there.
 - Narrow `Optional` results (`get_command`, `session.get`, `find_spec`) with an `assert x is not None` or an `if` before using them.
@@ -37,6 +40,8 @@ db/models/              SQLModel tables, one module per feature, all re-exported
 db/migrations/          Alembic. Database() runs upgrade_database on construction.
 config/schema.py        Pydantic schema. StrictModel (extra="forbid") everywhere.
 currency.py             integer base units, parsing and formatting
+web/                    the admin website's API: FastAPI app, one router per page, served by cogs/web.py
+frontend/               the admin website's pages: Vite + React + TypeScript, TanStack Query, Tailwind
 ```
 
 Rules the structure depends on:
@@ -46,6 +51,9 @@ Rules the structure depends on:
 - **Every balance change goes through `CoinService.move`.** It debits, credits and writes a `CoinTransaction` ledger row. Add a `CoinTransactionKind` for each new reason, with a comment showing the direction (`# Member -> house`). The ledger invariant is that, for each account, credits minus debits equals the balance. The legacy migration checks this, so never write `balance` directly.
 - **The house** is the bot's own account (`coins.house_user_id`, set in `setup_hook`). It takes bribes, purchases and market leftovers, and it's the only account allowed to go negative. Members pay the house. Coins don't vanish.
 - **The DB is the source of truth. Discord roles follow it.** Cogs that hand out roles also run a `tasks.loop` that reconciles them: they remove roles nobody paid for and restore roles that are missing (see `VipCog.sync_roles` and the jail timers). Use the same pattern for any new paid or timed role.
+- **The website is treated like a cog.** `web/` calls services and never opens a DB session itself or imports from `beans_bot.cogs`. When it needs something only a cog can do, the cog registers a callable on its service while it's loaded (`ClassifierService.retrainer` and `.model_info`, `AutoBetService.poster`), and the web answers 503 while it's None.
+- **Website-only reads live in `ReportService`** (`services/reports.py`), which only reads. Feature services keep every write.
+- **Discord IDs are strings in every JSON response and request.** Use `Snowflake` from `web/schemas.py` for every ID field, and string keys for dicts keyed by ID. JavaScript numbers can't hold them.
 - **Domain errors are plain exceptions in services** (`InsufficientFunds`, `BidTooLow`, `AlreadyOnePercent`). The cog catches them and replies in character. For an error that's only a message, raise `UserFacingError` (or `CheckMessage` from a check) and `BeansTree.on_error` shows it ephemerally. `AmountError` from `currency.parse` is handled the same way, so cogs can call `parse` without a try block.
 
 ## Conventions
@@ -81,6 +89,12 @@ Rules the structure depends on:
 - Use `# --- Section ---...` dividers in long classes (building blocks / operations, timers / commands).
 - Logging: `logger = logging.getLogger(__name__)` in services and `self.logger` in cogs, with f-strings. Log every coin-spending operation at INFO, with guild and user IDs.
 
+**Website**
+- Every non-GET request needs the `X-Beans-Admin: 1` header (the frontend's `api()` adds it). Mutating endpoints log the actor (`deps.actor`) at INFO with guild and target IDs.
+- Coins in responses are `Amount` (base units plus text). Requests take amounts as text and parse them with `currency.parse`, like the slash commands.
+- Never block the event loop: hashing uploads, shrinking photos, thumbnails and training go through `asyncio.to_thread`.
+- Each action button opens a `ConfirmDialog` that says in plain words what happens, including "this posts in Discord" when it does. Actions sit on the page of the thing they act on; there's no admin page. Config is shown, never edited.
+
 **Tone of the bot's voice**
 - Members are "members". The bot's replies are playful, a little theatrical and mean in a friendly way ("Peasant money.", "Back to the proletariat with you."). Each new user-facing message, error replies included, should have a joke in it while still saying exactly what went wrong and what it would cost.
 
@@ -109,7 +123,8 @@ Manifestos live in `manifestos/<name>/`: the member's own file (`manifesto.rtf` 
 
 ## Testing
 
-- Tests go through services against a real SQLite file in `tmp_path`, with migrations applied. Don't mock the DB. The `db`, `coins` (house = `HOUSE` = 999, cheddar off), `jail`, `markets` and `vip` fixtures live in `tests/conftest.py`.
+- Tests go through services against a real SQLite file in `tmp_path`, with migrations applied. Don't mock the DB. The `db`, `coins` (house = `HOUSE` = 999, cheddar off), `jail`, `markets`, `vip`, `reports` and `classifier` fixtures live in `tests/conftest.py`.
+- Website tests use the `web_client` fixture: an `httpx.AsyncClient` on the app with no Discord, real services on `tmp_path` (`web_services`) and a guild with most features on (`web_config`). Check money moves on both sides through the services, and that a failed action changed nothing. Discord-only endpoints are tested for their 503, or with the small fakes in `tests/test_web_actions.py`.
 - pytest-asyncio is in auto mode, so test functions are plain `async def`.
 - Assert balances in base units, and check both sides (member and house). Check that a failed operation changed nothing (balance unchanged, no row created).
 - Cogs aren't unit-tested beyond `test_commands.py`, which loads every cog and builds every command payload without a connection. That's why each new cog must be added there.
@@ -120,5 +135,6 @@ Manifestos live in `manifestos/<name>/`: the member's own file (`manifesto.rtf` 
 - `data/beans.db` is the live database (gitignored). Don't delete it, reset it or migrate it by hand. The bot migrates it on startup.
 - `.env` holds real secrets. Don't print it or commit it.
 - `models/classifier/*.pkl` are trained artifacts. Leave them alone unless the task is retraining (`scripts/train_classifier.py`).
+- The classifier's photos are rows in `classifier_image` plus shrunk JPEGs in `data/classifier_datasets/<model>/images/`. Corrections from Discord and website uploads add to them; `/admin retrain` and the website's Retrain train on the "train" photos and score on the "val" ones, recording a `classifier_training_run`. The old `data/classifier_corrections/` folder and the shipped `_training.pkl` embeddings are no longer read by the bot (`scripts/import_classifier_dataset.py` brings old corrections in once).
 - Classifier code may import torch and other packages that are only in the `classifier` extra. Keep those imports inside `cogs/classifier/` so the bot runs without the extra.
 - Don't commit unless asked. The working tree often holds the user's own work in progress.

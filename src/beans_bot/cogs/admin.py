@@ -8,23 +8,25 @@ Admin tools, for server admins. Every reply here is ephemeral, so nobody sees wh
   spent) and every stake is refunded. The thread hears about it, but not who did it.
 - /admin give and /admin take add or remove a member's coins or ShadowBeans. The house is the
   other side, so coins never appear from nowhere or vanish. The member isn't told.
-- /admin retrain retrains the image classifier on the photos members have confirmed and corrected.
-  It runs in the background and reports back when it's done.
+- /admin retrain retrains each of the server's classifier models that takes corrections, on its dataset's
+  train photos, and reports how each scored on its val photos. It runs in the background. The website
+  can retrain one dataset at a time too.
 """
 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 
 import discord
 from discord import app_commands
 
 from beans_bot.cogs.base import BeansCog, admin_only, requires_feature
-from beans_bot.services.classifier import RetrainFailed, RetrainInProgress, RetrainResult
+from beans_bot.db.models import ClassifierTrainingRun
+from beans_bot.services.classifier import RetrainFailed, RetrainInProgress
 from beans_bot.services.coins import InsufficientFunds
 from beans_bot.services.errors import UserFacingError
-from beans_bot.services.markets import SECRET_BET_ANNOUNCEMENT
+from beans_bot.services.markets import SECRET_BET_ANNOUNCEMENT, nullification_announcement
 
 # Discord's message length limit.
 MessageText = app_commands.Range[str, 1, 2000]
@@ -157,25 +159,14 @@ class AdminCog(BeansCog):
             raise UserFacingError("Use this in the prediction market thread you want to erase from history.")
         thread_id = interaction.channel_id
         nullification = await self.services.markets.nullify(thread_id, interaction.user.id)
-        currency = self.services.currency
-        house = self.services.coins.house_user_id
-        lines = [
-            "The house has reviewed the tape. This market never happened. Winnings are confiscated, stakes are refunded, "
-            "and anyone who already spent their winnings now owes me. Debt builds character."
-        ]
-        for user_id, net in nullification.nets:
-            who = "The house" if user_id == house else f"<@{user_id}>"
-            if net < 0:
-                lines.append(f"- {who} gives back {currency.format(-net)}")
-            else:
-                lines.append(f"- {who} gets back {currency.format(net)}")
+        announcement = nullification_announcement(nullification, self.services.currency, self.services.coins.house_user_id)
         try:
-            await interaction.channel.send("\n".join(lines))
+            await interaction.channel.send(announcement)
         except discord.HTTPException:
             self.logger.warning(f"Could not announce the nullified market {thread_id}")
         await interaction.response.send_message("Nullified. The coins are back where they started, debts and all.", ephemeral=True)
 
-    @admin.command(name="retrain", description="Retrain the image classifier on the photos members confirmed and corrected.")
+    @admin.command(name="retrain", description="Retrain the image classifier on its photos, and score it.")
     @admin_only()
     @requires_feature("classifier")
     async def retrain(self, interaction: discord.Interaction):
@@ -183,37 +174,42 @@ class AdminCog(BeansCog):
         retrainer = self.services.classifier.retrainer
         if retrainer is None:
             raise UserFacingError("The classifier isn't running on this bot, so there's no brain here to retrain.")
+        config = self.guild_config(interaction.guild_id)
+        models = config.classifier.models if config and config.classifier else {}
+        datasets = sorted({model.model_path for model in models.values() if model.corrections is not None})
+        if not datasets:
+            raise UserFacingError("No model here takes corrections, so I have nothing new to learn.")
         await interaction.response.send_message(
             "Fine, back to school. I'll keep guessing with my old brain while I study, and tell you here when the new one is in.", ephemeral=True
         )
         # Keep a reference, or the task can be garbage collected before it finishes.
-        task = asyncio.create_task(self._retrain(interaction, retrainer(interaction.guild_id)))
+        task = asyncio.create_task(self._retrain(interaction, retrainer, datasets))
         self.retrain_tasks.add(task)
         task.add_done_callback(self.retrain_tasks.discard)
 
-    async def _retrain(self, interaction: discord.Interaction, retraining: Awaitable[list[RetrainResult]]) -> None:
-        """Waits for a retrain and tells the admin how it went."""
-        try:
-            results = await retraining
-        except RetrainInProgress:
-            report = "I'm already mid-lesson. One education at a time."
-        except RetrainFailed as e:
-            report = str(e)
-        except Exception:
-            self.logger.exception(f"Retrain failed in guild {interaction.guild_id}")
-            report = "I studied so hard that something broke. My brain is unchanged. The logs know why."
-        else:
-            lines = ["Class dismissed. I'm guessing with the new brain now."]
-            for result in results:
-                unreadable = f", {result.skipped} I couldn't read" if result.skipped else ""
-                counts = ", ".join(f"{label} {count}" for label, count in result.counts.items())
-                lines.append(f"- **{result.name}**: {sum(result.counts.values())} photos, {result.added} of them from members{unreadable}")
-                lines.append(f"-# {counts}")
-            report = "\n".join(lines)[:2000]
+    async def _retrain(
+        self, interaction: discord.Interaction, retrainer: Callable[[str, str], Awaitable[ClassifierTrainingRun]], datasets: list[str]
+    ) -> None:
+        """Retrains each dataset in turn and tells the admin how it went."""
+        lines = []
+        for dataset in datasets:
+            try:
+                run = await retrainer(dataset, f"discord:{interaction.user.id}")
+            except RetrainInProgress:
+                lines.append(f"- **{dataset}**: I'm already mid-lesson. One education at a time.")
+            except RetrainFailed as e:
+                lines.append(f"- **{dataset}**: {e}")
+            except Exception:
+                self.logger.exception(f"Retrain of {dataset} failed in guild {interaction.guild_id}")
+                lines.append(f"- **{dataset}**: I studied so hard that something broke. My brain is unchanged. The logs know why.")
+            else:
+                score = f"{run.accuracy:.0%} right on {run.val_count} val photos" if run.accuracy is not None else "no val photos to grade me on"
+                lines.append(f"- **{dataset}**: trained on {run.train_count} photos, {score}")
+        report = "\n".join(["Class dismissed. Report card:", *lines])[:2000]
         try:
             await interaction.followup.send(report, ephemeral=True)
         except discord.HTTPException:
-            # The interaction expires after 15 minutes. The result is in the log either way.
+            # The interaction expires after 15 minutes. The result is in the log and the website either way.
             self.logger.warning(f"Could not report the retrain in guild {interaction.guild_id}")
 
     @admin.command(name="give", description="Give a member coins or ShadowBeans from the house. Only you see it.")

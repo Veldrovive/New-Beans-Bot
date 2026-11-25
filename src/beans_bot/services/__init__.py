@@ -16,6 +16,7 @@ from beans_bot.services.heists import HeistService
 from beans_bot.services.jail import JailService
 from beans_bot.services.manifesto import ManifestoService
 from beans_bot.services.markets import MarketService
+from beans_bot.services.reports import ReportService
 from beans_bot.services.snipes import SnipeService
 from beans_bot.services.vip import VipService
 
@@ -36,6 +37,7 @@ class Services:
     heists: HeistService
     classifier: ClassifierService
     gemini: GeminiService
+    reports: ReportService
 
     @classmethod
     def build(cls, config: BotConfig) -> Services:
@@ -57,6 +59,7 @@ class Services:
             snipes=SnipeService(db),
             manifesto=ManifestoService(config, db, vip),
             heists=HeistService(db, coins, vip),
-            classifier=ClassifierService(db, config.classifier.corrections_dir),
+            classifier=ClassifierService(db, config.classifier.datasets_dir, config.classifier.val_fraction),
             gemini=GeminiService(config.gemini),
+            reports=ReportService(db, coins),
         )

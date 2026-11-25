@@ -4,6 +4,8 @@ VIP: day passes and the one permanent "1%" title, both bought with BeanCoins.
 - The 1% can appoint one henchman for free. The henchman is fired when the
   title changes hands, in the same transaction as the claim.
 
+An admin can end a day pass early or take the 1% away (no refunds) from the admin site.
+
 Each purchase pays the house and updates the records in one transaction, so two
 members can't both claim the title at the same price. The VIP cog keeps the
 Discord roles in line with these records.
@@ -112,14 +114,19 @@ class VipService:
             )
             return list(result.all())
 
-    async def end_pass(self, pass_id: int) -> bool:
-        """Mark a pass ended. False if it already was, or was extended past now in the meantime."""
+    async def end_pass(self, pass_id: int, *, early: bool = False) -> bool:
+        """
+        Mark a pass ended. False if it already was, or was extended past now in the meantime. With `early`
+        it ends even with time left: an admin taking it away. No refund; the role follows within a minute.
+        """
         async with self.db.transaction() as session:
             day_pass = await session.get(VipDayPass, pass_id)
-            if day_pass is None or day_pass.ended_at is not None or day_pass.ends_at > utcnow():
+            if day_pass is None or day_pass.ended_at is not None or (day_pass.ends_at > utcnow() and not early):
                 return False
             day_pass.ended_at = utcnow()
-            return True
+        if early:
+            logger.info(f"Day pass {pass_id} of {day_pass.user_id} in guild {day_pass.guild_id} ended early by an admin")
+        return True
 
     # --- The 1% -------------------------------------------------------------------------
 
@@ -167,6 +174,17 @@ class VipService:
         return OnePercentClaim(
             previous_holder_id=previous_holder_id, paid=amount, new_price=new_price, previous_henchman_id=previous_henchman_id
         )
+
+    async def revoke_one_percent(self, guild_id: int) -> OnePercentTitle | None:
+        """
+        An admin takes the title away. No refund; the price goes back to the starting price and the
+        henchman goes too. Returns the old record, or None if nobody held it. The VIP cog moves the roles.
+        """
+        async with self.db.transaction() as session:
+            title = await session.get(OnePercentTitle, guild_id)
+            if title is None:
+                return None
+            return await self._revoke_one_percent(session, guild_id, title.holder_user_id)
 
     async def _revoke_one_percent(self, session: AsyncSession, guild_id: int, user_id: int) -> OnePercentTitle | None:
         """

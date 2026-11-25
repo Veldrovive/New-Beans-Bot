@@ -44,9 +44,13 @@ class GeminiConfig(StrictModel):
 class ClassifierGlobalConfig(StrictModel):
     enabled: bool = True
     models_dir: Path = Path("models/classifier")
-    # Corrected photos are saved here as <model_path>/<label>/<image>. It's under data/ so it survives a rebuild.
+    # Every model's photos, shrunk, as <model_path>/images/<hash>.jpg, indexed in the classifier_image table.
+    # The website manages them, and retraining trains on them. Under data/ so it survives a rebuild.
+    datasets_dir: Path = Path("data/classifier_datasets")
+    val_fraction: float = 0.2  # Share of new photos held out to score each retrain
+    # Where corrected photos used to be saved. Only scripts/import_classifier_dataset.py --corrections reads it now.
     corrections_dir: Path = Path("data/classifier_corrections")
-    # Models retrained by /admin retrain are saved here. One of these is used instead of the one in models_dir.
+    # Models retrained by /admin retrain or the website are saved here. One of these is used instead of the one in models_dir.
     retrained_dir: Path = Path("data/classifier_models")
     device: str = "cpu"
     torch_cpu_threads: int = 1
@@ -55,6 +59,17 @@ class ClassifierGlobalConfig(StrictModel):
 
 class CurrencyConfig(StrictModel):
     cheddar_enabled: bool = False
+
+
+class WebConfig(StrictModel):
+    """The admin website, served by the bot itself. See src/beans_bot/web/."""
+
+    enabled: bool = False  # Off by default so tests and bare BotConfig() never open a port
+    host: str = "127.0.0.1"
+    port: int = 8377
+    static_dir: Path = Path("frontend/dist")
+    # Recorded as the actor on ledger rows for coins given or taken from the website.
+    actor_user_id: int | None = None
 
 
 # --- Per guild ------------------------------------------------------------------------
@@ -378,6 +393,7 @@ class BotConfig(StrictModel):
     currency: CurrencyConfig = CurrencyConfig()
     gemini: GeminiConfig = GeminiConfig()
     classifier: ClassifierGlobalConfig = ClassifierGlobalConfig()
+    web: WebConfig = WebConfig()
 
     guilds: dict[int, GuildConfig] = Field(default_factory=dict)
 

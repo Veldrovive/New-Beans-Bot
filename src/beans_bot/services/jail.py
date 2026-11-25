@@ -4,6 +4,9 @@ Jail: sentences, the jail role, mega jail renames and tomato records.
 Any cog that needs to know whether someone is jailed, or to jail or release
 someone, goes through JailService. It is the only code that touches the jail role.
 
+The admin site can jail a member (reason "admin") or release one. Releasing always goes through
+release(), so the role comes off with the sentence.
+
 Members can also frame each other: pay the house to start someone else's sentence.
 The payment and the sentence happen in one transaction, so nobody pays for a
 sentence that never starts (or that someone else already started).

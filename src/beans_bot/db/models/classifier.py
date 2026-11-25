@@ -1,6 +1,7 @@
 import datetime
+from enum import StrEnum
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import JSON, Column, Field, SQLModel, UniqueConstraint
 
 from beans_bot.db.types import UTCDateTime, utcnow
 
@@ -47,3 +48,56 @@ class ClassifierCorrection(SQLModel, table=True):
     label: str
     corrected_by: int
     corrected_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+
+
+class ClassifierSplit(StrEnum):
+    TRAIN = "train"
+    VAL = "val"  # Held out to score each retrain
+
+
+class ClassifierImageSource(StrEnum):
+    SEED = "seed"  # The original dataset from Aidan's Mac, brought in by scripts/import_classifier_dataset.py
+    CORRECTION = "correction"  # A member confirmed or corrected the bot's guess in Discord
+    UPLOAD = "upload"  # Added on the admin website
+
+
+class ClassifierImage(SQLModel, table=True):
+    """One photo in a classifier's dataset. The file is <datasets_dir>/<dataset>/images/<filename>."""
+
+    __tablename__ = "classifier_image"
+    __table_args__ = (UniqueConstraint("dataset", "content_hash"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    dataset: str = Field(index=True)  # The model's model_path, like "cats"
+    content_hash: str  # md5 of the bytes as they arrived, hex. Also the embedding cache key.
+    filename: str  # "<content_hash>.jpg": the shrunk copy that is kept
+    original_name: str | None = None
+    label: str = Field(index=True)
+    split: str  # A ClassifierSplit
+    source: str  # A ClassifierImageSource
+    guild_id: int | None = None  # Set for corrections
+    message_id: int | None = Field(default=None, index=True)
+    added_by: int | None = None  # The member who confirmed or corrected it
+    added_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    updated_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    removed_at: datetime.datetime | None = Field(default=None, sa_type=UTCDateTime)  # Soft delete: not trained on, can be restored
+
+
+class ClassifierTrainingRun(SQLModel, table=True):
+    """One retrain. The newest succeeded run of a dataset describes the model the bot is using."""
+
+    __tablename__ = "classifier_training_run"
+
+    id: int | None = Field(default=None, primary_key=True)
+    dataset: str = Field(index=True)
+    status: str  # "running", "succeeded" or "failed"
+    triggered_by: str  # "web:<email>" or "discord:<user id>"
+    started_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    finished_at: datetime.datetime | None = Field(default=None, sa_type=UTCDateTime)
+    error: str | None = None
+    train_count: int | None = None
+    val_count: int | None = None
+    accuracy: float | None = None
+    log_loss: float | None = None
+    # labels, per_label, confusion, predictions, skipped, unseen_val_labels. See training.RunResults.
+    results: dict | None = Field(default=None, sa_column=Column(JSON))

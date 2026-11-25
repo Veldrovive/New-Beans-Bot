@@ -14,6 +14,8 @@ The cog makes them pay for it with jail and an @everyone.
   resolution reveals it. Scammers have to guess which side to rob.
 - Admins can nullify a resolved market: everything it paid out is taken back, even if that
   puts members in debt, and every stake is refunded, as if it had been canceled.
+- The admin site can bet for the house, and close, cancel or nullify any market without being
+  one of its managers. Resolving stays in Discord, where the announcement and the rigging check live.
 """
 
 from __future__ import annotations
@@ -27,6 +29,7 @@ from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from beans_bot.config.schema import BotBettingConfig
+from beans_bot.currency import CurrencySystem
 from beans_bot.db.engine import Database
 from beans_bot.db.models import CoinTransaction, CoinTransactionKind, JailReason, MarketBet, MarketStatus, PredictionMarket
 from beans_bot.db.types import utcnow
@@ -128,6 +131,21 @@ class Nullification:
     nets: list[tuple[int, int]]  # (user_id, amount): what each bettor got back (positive) or gave back (negative)
 
 
+def nullification_announcement(nullification: Nullification, currency: CurrencySystem, house_user_id: int | None) -> str:
+    """What the thread hears when a market is nullified. Never says who did it."""
+    lines = [
+        "The house has reviewed the tape. This market never happened. Winnings are confiscated, stakes are refunded, "
+        "and anyone who already spent their winnings now owes me. Debt builds character."
+    ]
+    for user_id, net in nullification.nets:
+        who = "The house" if user_id == house_user_id else f"<@{user_id}>"
+        if net < 0:
+            lines.append(f"- {who} gives back {currency.format(-net)}")
+        else:
+            lines.append(f"- {who} gets back {currency.format(net)}")
+    return "\n".join(lines)
+
+
 class MarketService:
     def __init__(self, db: Database, coins: CoinService, jail: JailService):
         self.db = db
@@ -217,10 +235,12 @@ class MarketService:
         if user_id != market.creator_id and user_id not in market.admin_ids:
             raise UserFacingError("Only the prediction's managers can use this command.")
 
-    async def close(self, thread_id: int, user_id: int) -> None:
+    async def close(self, thread_id: int, user_id: int | None) -> None:
+        """Stop the betting without naming a winner. `user_id` None skips the manager check (the admin site)."""
         async with self.db.transaction() as session:
             market = await self._market(session, thread_id)
-            self._require_creator(market, user_id)
+            if user_id is not None:
+                self._require_creator(market, user_id)
             if market.status != MarketStatus.OPEN:
                 raise UserFacingError(f"Market is already {market.status}.")
             market.status = MarketStatus.CLOSED

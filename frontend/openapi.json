@@ -1,0 +1,5949 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Beans Bot admin",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/meta": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Meta",
+        "operationId": "meta_api_meta_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Meta"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds": {
+      "get": {
+        "tags": [
+          "meta"
+        ],
+        "summary": "Guilds",
+        "operationId": "guilds_api_guilds_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/GuildSummary"
+                  },
+                  "type": "array",
+                  "title": "Response Guilds Api Guilds Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/directory": {
+      "get": {
+        "tags": [
+          "directory"
+        ],
+        "summary": "Directory",
+        "operationId": "directory_api_guilds__guild_id__directory_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Directory"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/members": {
+      "get": {
+        "tags": [
+          "members"
+        ],
+        "summary": "Members",
+        "operationId": "members_api_guilds__guild_id__members_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MemberRow"
+                  },
+                  "title": "Response Members Api Guilds  Guild Id  Members Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/coins/accounts": {
+      "get": {
+        "tags": [
+          "coins"
+        ],
+        "summary": "Accounts",
+        "operationId": "accounts_api_guilds__guild_id__coins_accounts_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accounts"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/coins/ledger": {
+      "get": {
+        "tags": [
+          "coins"
+        ],
+        "summary": "Ledger",
+        "operationId": "ledger_api_guilds__guild_id__coins_ledger_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LedgerPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/coins/give": {
+      "post": {
+        "tags": [
+          "coins"
+        ],
+        "summary": "Give",
+        "operationId": "give_api_guilds__guild_id__coins_give_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GiveTake"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PocketResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/coins/take": {
+      "post": {
+        "tags": [
+          "coins"
+        ],
+        "summary": "Take",
+        "operationId": "take_api_guilds__guild_id__coins_take_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GiveTake"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PocketResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/jail/current": {
+      "get": {
+        "tags": [
+          "jail"
+        ],
+        "summary": "Current",
+        "operationId": "current_api_guilds__guild_id__jail_current_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SentenceRow"
+                  },
+                  "title": "Response Current Api Guilds  Guild Id  Jail Current Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/jail/sentences": {
+      "get": {
+        "tags": [
+          "jail"
+        ],
+        "summary": "Sentences",
+        "operationId": "sentences_api_guilds__guild_id__jail_sentences_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SentenceRow_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/jail/stats": {
+      "get": {
+        "tags": [
+          "jail"
+        ],
+        "summary": "Stats",
+        "operationId": "stats_api_guilds__guild_id__jail_stats_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JailStatsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/jail/release": {
+      "post": {
+        "tags": [
+          "jail"
+        ],
+        "summary": "Release",
+        "operationId": "release_api_guilds__guild_id__jail_release_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Target"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/jail/imprison": {
+      "post": {
+        "tags": [
+          "jail"
+        ],
+        "summary": "Imprison",
+        "operationId": "imprison_api_guilds__guild_id__jail_imprison_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Target"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/markets": {
+      "get": {
+        "tags": [
+          "markets"
+        ],
+        "summary": "Markets",
+        "operationId": "markets_api_guilds__guild_id__markets_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MarketRowOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/markets/{thread_id}": {
+      "get": {
+        "tags": [
+          "markets"
+        ],
+        "summary": "Market",
+        "operationId": "market_api_guilds__guild_id__markets__thread_id__get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarketDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/markets/{thread_id}/house-bet": {
+      "post": {
+        "tags": [
+          "markets"
+        ],
+        "summary": "House Bet",
+        "operationId": "house_bet_api_guilds__guild_id__markets__thread_id__house_bet_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HouseBet"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/markets/{thread_id}/close": {
+      "post": {
+        "tags": [
+          "markets"
+        ],
+        "summary": "Close",
+        "operationId": "close_api_guilds__guild_id__markets__thread_id__close_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/markets/{thread_id}/cancel": {
+      "post": {
+        "tags": [
+          "markets"
+        ],
+        "summary": "Cancel",
+        "operationId": "cancel_api_guilds__guild_id__markets__thread_id__cancel_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/markets/{thread_id}/nullify": {
+      "post": {
+        "tags": [
+          "markets"
+        ],
+        "summary": "Nullify",
+        "operationId": "nullify_api_guilds__guild_id__markets__thread_id__nullify_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "thread_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Thread Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/auto-bets": {
+      "get": {
+        "tags": [
+          "auto bets"
+        ],
+        "summary": "Auto Bets",
+        "operationId": "auto_bets_api_guilds__guild_id__auto_bets_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AutoBetsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/auto-bets/post": {
+      "post": {
+        "tags": [
+          "auto bets"
+        ],
+        "summary": "Post Now",
+        "description": "Post an automatic bet now, on top of the daily one. The auto bets cog does the posting.",
+        "operationId": "post_now_api_guilds__guild_id__auto_bets_post_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Posted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/vip": {
+      "get": {
+        "tags": [
+          "vip"
+        ],
+        "summary": "Vip",
+        "operationId": "vip_api_guilds__guild_id__vip_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VipOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/vip/passes/{pass_id}/end": {
+      "post": {
+        "tags": [
+          "vip"
+        ],
+        "summary": "End Pass",
+        "operationId": "end_pass_api_guilds__guild_id__vip_passes__pass_id__end_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "pass_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Pass Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/vip/one-percent/revoke": {
+      "post": {
+        "tags": [
+          "vip"
+        ],
+        "summary": "Revoke One Percent",
+        "operationId": "revoke_one_percent_api_guilds__guild_id__vip_one_percent_revoke_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/snipes": {
+      "get": {
+        "tags": [
+          "snipes"
+        ],
+        "summary": "Snipes",
+        "operationId": "snipes_api_guilds__guild_id__snipes_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnipesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/heists": {
+      "get": {
+        "tags": [
+          "heists"
+        ],
+        "summary": "Heists",
+        "operationId": "heists_api_guilds__guild_id__heists_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Active"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_HeistOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/manifestos": {
+      "get": {
+        "tags": [
+          "manifestos"
+        ],
+        "summary": "Manifestos",
+        "operationId": "manifestos_api_guilds__guild_id__manifestos_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ManifestoOut"
+                  },
+                  "title": "Response Manifestos Api Guilds  Guild Id  Manifestos Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/manifestos/{user_id}/wisdom": {
+      "post": {
+        "tags": [
+          "manifestos"
+        ],
+        "summary": "Add Wisdom",
+        "operationId": "add_wisdom_api_guilds__guild_id__manifestos__user_id__wisdom_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WisdomText"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/manifestos/{user_id}/wisdom/{index}": {
+      "patch": {
+        "tags": [
+          "manifestos"
+        ],
+        "summary": "Edit Wisdom",
+        "operationId": "edit_wisdom_api_guilds__guild_id__manifestos__user_id__wisdom__index__patch",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WisdomText"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "manifestos"
+        ],
+        "summary": "Remove Wisdom",
+        "operationId": "remove_wisdom_api_guilds__guild_id__manifestos__user_id__wisdom__index__delete",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/daily-posts": {
+      "get": {
+        "tags": [
+          "daily posts"
+        ],
+        "summary": "Daily Posts",
+        "operationId": "daily_posts_api_guilds__guild_id__daily_posts_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "birthdays_offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Birthdays Offset"
+            }
+          },
+          {
+            "name": "holidays_offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Holidays Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyPostsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/fat-cow": {
+      "get": {
+        "tags": [
+          "fat cow"
+        ],
+        "summary": "Fat Cow",
+        "operationId": "fat_cow_api_guilds__guild_id__fat_cow_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FatCowOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/role-polls": {
+      "get": {
+        "tags": [
+          "role polls"
+        ],
+        "summary": "Role Polls",
+        "operationId": "role_polls_api_guilds__guild_id__role_polls_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PollOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/classifier/guesses": {
+      "get": {
+        "tags": [
+          "classifier"
+        ],
+        "summary": "Guesses",
+        "operationId": "guesses_api_guilds__guild_id__classifier_guesses_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_GuessOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/classifier/datasets": {
+      "get": {
+        "tags": [
+          "classifier"
+        ],
+        "summary": "Datasets",
+        "operationId": "datasets_api_classifier_datasets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DatasetOut"
+                  },
+                  "type": "array",
+                  "title": "Response Datasets Api Classifier Datasets Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/classifier/datasets/{dataset}/images": {
+      "get": {
+        "tags": [
+          "classifier"
+        ],
+        "summary": "Images",
+        "operationId": "images_api_classifier_datasets__dataset__images_get",
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset"
+            }
+          },
+          {
+            "name": "label",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Label"
+            }
+          },
+          {
+            "name": "split",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "train",
+                    "val"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Split"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "seed",
+                    "correction",
+                    "upload"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "removed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": false,
+              "title": "Removed"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ImageOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "classifier"
+        ],
+        "summary": "Upload",
+        "description": "One photo per request: Cloudflare caps a request at 100 MB.",
+        "operationId": "upload_api_classifier_datasets__dataset__images_post",
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_api_classifier_datasets__dataset__images_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Uploaded"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/classifier/images/{image_id}/file": {
+      "get": {
+        "tags": [
+          "classifier"
+        ],
+        "summary": "Image File",
+        "operationId": "image_file_api_classifier_images__image_id__file_get",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Image Id"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "thumb",
+                "large"
+              ],
+              "type": "string",
+              "default": "thumb",
+              "title": "Size"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/classifier/images/{image_id}": {
+      "patch": {
+        "tags": [
+          "classifier"
+        ],
+        "summary": "Change Image",
+        "operationId": "change_image_api_classifier_images__image_id__patch",
+        "parameters": [
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Image Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImageChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/classifier/images/bulk": {
+      "post": {
+        "tags": [
+          "classifier"
+        ],
+        "summary": "Change Images",
+        "operationId": "change_images_api_classifier_images_bulk_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Changed"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/classifier/datasets/{dataset}/retrain": {
+      "post": {
+        "tags": [
+          "classifier"
+        ],
+        "summary": "Retrain",
+        "operationId": "retrain_api_classifier_datasets__dataset__retrain_post",
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Started"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/classifier/datasets/{dataset}/progress": {
+      "get": {
+        "tags": [
+          "classifier"
+        ],
+        "summary": "Progress",
+        "operationId": "progress_api_classifier_datasets__dataset__progress_get",
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Progress"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/classifier/datasets/{dataset}/runs": {
+      "get": {
+        "tags": [
+          "classifier"
+        ],
+        "summary": "Runs",
+        "operationId": "runs_api_classifier_datasets__dataset__runs_get",
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Dataset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RunSummary_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/classifier/runs/{run_id}": {
+      "get": {
+        "tags": [
+          "classifier"
+        ],
+        "summary": "Run",
+        "operationId": "run_api_classifier_runs__run_id__get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/config/{section}": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Guild Section",
+        "description": "One section of a guild's config, or null when the feature is off.",
+        "operationId": "guild_section_api_guilds__guild_id__config__section__get",
+        "parameters": [
+          {
+            "name": "section",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Section"
+            }
+          },
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Guild Section Api Guilds  Guild Id  Config  Section  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config/global": {
+      "get": {
+        "tags": [
+          "config"
+        ],
+        "summary": "Global Config",
+        "description": "Everything outside `guilds`, with secrets masked.",
+        "operationId": "global_config_api_config_global_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "Response Global Config Api Config Global Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/admin/say": {
+      "post": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Say",
+        "operationId": "say_api_guilds__guild_id__admin_say_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Say"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Said"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/guilds/{guild_id}/admin/dm": {
+      "post": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Dm",
+        "operationId": "dm_api_guilds__guild_id__admin_dm_post",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Dm"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Done"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/sync": {
+      "post": {
+        "tags": [
+          "bot"
+        ],
+        "summary": "Sync",
+        "operationId": "sync_api_admin_sync_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Synced"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AccountRow": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "shadow_balance": {
+            "$ref": "#/components/schemas/Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "balance",
+          "shadow_balance"
+        ],
+        "title": "AccountRow"
+      },
+      "Accounts": {
+        "properties": {
+          "house": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccountRow"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "accounts": {
+            "items": {
+              "$ref": "#/components/schemas/AccountRow"
+            },
+            "type": "array",
+            "title": "Accounts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "house",
+          "accounts"
+        ],
+        "title": "Accounts"
+      },
+      "Amount": {
+        "properties": {
+          "value": {
+            "type": "integer",
+            "title": "Value"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "text"
+        ],
+        "title": "Amount",
+        "description": "Coins: the integer base units, and the same amount as text."
+      },
+      "AutoBetOut": {
+        "properties": {
+          "bet": {
+            "type": "string",
+            "title": "Bet"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Values"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
+          "posted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Posted At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bet",
+          "text",
+          "values",
+          "round",
+          "posted_at"
+        ],
+        "title": "AutoBetOut"
+      },
+      "AutoBetsOut": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "bets_file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bets File"
+          },
+          "post_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Post Time"
+          },
+          "post_probability": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Post Probability"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "bets": {
+            "items": {
+              "$ref": "#/components/schemas/BetTemplate"
+            },
+            "type": "array",
+            "title": "Bets"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
+          "history": {
+            "$ref": "#/components/schemas/Page_PostOut_"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "bets_file",
+          "post_time",
+          "post_probability",
+          "error",
+          "bets",
+          "round",
+          "history"
+        ],
+        "title": "AutoBetsOut"
+      },
+      "BetOut": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "choice": {
+            "type": "string",
+            "title": "Choice"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "placed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Placed At"
+          },
+          "secret": {
+            "type": "boolean",
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "choice",
+          "amount",
+          "placed_at",
+          "secret"
+        ],
+        "title": "BetOut"
+      },
+      "BetTemplate": {
+        "properties": {
+          "bet": {
+            "type": "string",
+            "title": "Bet"
+          },
+          "params": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Params"
+          },
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Choices"
+          },
+          "bot_bet": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Amount"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Bet"
+          },
+          "admins": {
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "type": "array",
+            "title": "Admins"
+          },
+          "used_this_round": {
+            "type": "boolean",
+            "title": "Used This Round"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bet",
+          "params",
+          "choices",
+          "bot_bet",
+          "admins",
+          "used_this_round"
+        ],
+        "title": "BetTemplate"
+      },
+      "BirthdayOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "sent_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Sent On"
+          },
+          "channel_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Channel Id"
+          },
+          "message_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Message Id"
+          },
+          "person_name": {
+            "type": "string",
+            "title": "Person Name"
+          },
+          "for_year": {
+            "type": "integer",
+            "title": "For Year"
+          },
+          "used_holiday": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used Holiday"
+          },
+          "used_on_this_day": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Used On This Day"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sent_on",
+          "channel_id",
+          "message_id",
+          "person_name",
+          "for_year",
+          "used_holiday",
+          "used_on_this_day"
+        ],
+        "title": "BirthdayOut"
+      },
+      "Body_upload_api_classifier_datasets__dataset__images_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "split": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "train",
+              "val"
+            ],
+            "title": "Split",
+            "default": "auto"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "label"
+        ],
+        "title": "Body_upload_api_classifier_datasets__dataset__images_post"
+      },
+      "BotUser": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "avatar_url"
+        ],
+        "title": "BotUser"
+      },
+      "BulkChange": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "split": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "train",
+                  "val"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split"
+          },
+          "removed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Removed"
+          },
+          "ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ids"
+        ],
+        "title": "BulkChange"
+      },
+      "Changed": {
+        "properties": {
+          "changed": {
+            "type": "integer",
+            "title": "Changed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "changed"
+        ],
+        "title": "Changed"
+      },
+      "ChoiceTotal": {
+        "properties": {
+          "choice": {
+            "type": "string",
+            "title": "Choice"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "choice",
+          "amount"
+        ],
+        "title": "ChoiceTotal"
+      },
+      "CouncilMember": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "council_name": {
+            "type": "string",
+            "title": "Council Name"
+          },
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "crest_emoji": {
+            "type": "string",
+            "title": "Crest Emoji"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "council_name",
+          "user_id",
+          "crest_emoji"
+        ],
+        "title": "CouncilMember"
+      },
+      "Count": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "count"
+        ],
+        "title": "Count"
+      },
+      "CrewMember": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "joined_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Joined At"
+          },
+          "share": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fine": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "joined_at",
+          "share",
+          "fine"
+        ],
+        "title": "CrewMember"
+      },
+      "CurrencyUnit": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "plural": {
+            "type": "string",
+            "title": "Plural"
+          },
+          "base_units": {
+            "type": "integer",
+            "title": "Base Units"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "plural",
+          "base_units"
+        ],
+        "title": "CurrencyUnit"
+      },
+      "DailyPostsOut": {
+        "properties": {
+          "birthdays": {
+            "$ref": "#/components/schemas/Page_BirthdayOut_"
+          },
+          "action_holidays": {
+            "$ref": "#/components/schemas/Page_HolidayOut_"
+          }
+        },
+        "type": "object",
+        "required": [
+          "birthdays",
+          "action_holidays"
+        ],
+        "title": "DailyPostsOut"
+      },
+      "DatasetOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/LabelCount"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest_run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "changed_since_latest_run": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed Since Latest Run"
+          },
+          "running": {
+            "type": "boolean",
+            "title": "Running"
+          },
+          "guilds": {
+            "items": {
+              "$ref": "#/components/schemas/GuildModel"
+            },
+            "type": "array",
+            "title": "Guilds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "labels",
+          "model",
+          "latest_run",
+          "changed_since_latest_run",
+          "running",
+          "guilds"
+        ],
+        "title": "DatasetOut"
+      },
+      "Directory": {
+        "properties": {
+          "members": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DirectoryMember"
+            },
+            "type": "object",
+            "title": "Members"
+          },
+          "roles": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DirectoryRole"
+            },
+            "type": "object",
+            "title": "Roles"
+          },
+          "channels": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DirectoryChannel"
+            },
+            "type": "object",
+            "title": "Channels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "members",
+          "roles",
+          "channels"
+        ],
+        "title": "Directory"
+      },
+      "DirectoryChannel": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "parent_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "DirectoryChannel"
+      },
+      "DirectoryMember": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "avatar_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avatar Url"
+          },
+          "bot": {
+            "type": "boolean",
+            "title": "Bot"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "display_name",
+          "avatar_url",
+          "bot"
+        ],
+        "title": "DirectoryMember"
+      },
+      "DirectoryRole": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "color"
+        ],
+        "title": "DirectoryRole"
+      },
+      "Dm": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "message"
+        ],
+        "title": "Dm"
+      },
+      "Done": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "Done",
+        "description": "A plain answer for actions with nothing else to say."
+      },
+      "EaterOut": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "visits": {
+            "type": "integer",
+            "title": "Visits"
+          },
+          "total_meters": {
+            "type": "number",
+            "title": "Total Meters"
+          },
+          "average_meters": {
+            "type": "number",
+            "title": "Average Meters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "visits",
+          "total_meters",
+          "average_meters"
+        ],
+        "title": "EaterOut"
+      },
+      "FatCowOut": {
+        "properties": {
+          "visits": {
+            "items": {
+              "$ref": "#/components/schemas/VisitOut"
+            },
+            "type": "array",
+            "title": "Visits"
+          },
+          "members": {
+            "items": {
+              "$ref": "#/components/schemas/EaterOut"
+            },
+            "type": "array",
+            "title": "Members"
+          }
+        },
+        "type": "object",
+        "required": [
+          "visits",
+          "members"
+        ],
+        "title": "FatCowOut"
+      },
+      "GiveTake": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "description": "Like \"5\" or \"3 cheddar\", as in the slash commands"
+          },
+          "shadow": {
+            "type": "boolean",
+            "title": "Shadow",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "amount"
+        ],
+        "title": "GiveTake"
+      },
+      "GuessOut": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Message Id"
+          },
+          "channel_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Channel Id"
+          },
+          "classifier_name": {
+            "type": "string",
+            "title": "Classifier Name"
+          },
+          "predicted_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predicted Label"
+          },
+          "reply_message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Message Id"
+          },
+          "processed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Processed At"
+          },
+          "corrected_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected Label"
+          },
+          "corrected_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected By"
+          },
+          "corrected_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Corrected At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "channel_id",
+          "classifier_name",
+          "predicted_label",
+          "reply_message_id",
+          "processed_at",
+          "corrected_label",
+          "corrected_by",
+          "corrected_at"
+        ],
+        "title": "GuessOut"
+      },
+      "GuildModel": {
+        "properties": {
+          "guild_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Guild Id"
+          },
+          "guild_name": {
+            "type": "string",
+            "title": "Guild Name"
+          },
+          "model_name": {
+            "type": "string",
+            "title": "Model Name"
+          },
+          "corrections": {
+            "type": "boolean",
+            "title": "Corrections"
+          }
+        },
+        "type": "object",
+        "required": [
+          "guild_id",
+          "guild_name",
+          "model_name",
+          "corrections"
+        ],
+        "title": "GuildModel"
+      },
+      "GuildSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "connected": {
+            "type": "boolean",
+            "title": "Connected"
+          },
+          "member_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Member Count"
+          },
+          "bot_channel_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bot Channel Id"
+          },
+          "features": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Features"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "active",
+          "connected",
+          "member_count",
+          "bot_channel_id",
+          "features"
+        ],
+        "title": "GuildSummary"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HeistOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "leader_user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Leader User Id"
+          },
+          "target_user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Target User Id"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "snipe_message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snipe Message Id"
+          },
+          "loot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "snitch_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snitch User Id"
+          },
+          "snitch_reward": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "crew": {
+            "items": {
+              "$ref": "#/components/schemas/CrewMember"
+            },
+            "type": "array",
+            "title": "Crew"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "code",
+          "status",
+          "leader_user_id",
+          "target_user_id",
+          "started_at",
+          "ends_at",
+          "finished_at",
+          "snipe_message_id",
+          "loot",
+          "snitch_user_id",
+          "snitch_reward",
+          "crew"
+        ],
+        "title": "HeistOut"
+      },
+      "HolidayOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "sent_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Sent On"
+          },
+          "holiday_name": {
+            "type": "string",
+            "title": "Holiday Name"
+          },
+          "holiday_link": {
+            "type": "string",
+            "title": "Holiday Link"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sent_on",
+          "holiday_name",
+          "holiday_link"
+        ],
+        "title": "HolidayOut"
+      },
+      "HouseBet": {
+        "properties": {
+          "choice": {
+            "type": "string",
+            "title": "Choice"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "choice",
+          "amount"
+        ],
+        "title": "HouseBet"
+      },
+      "ImageChange": {
+        "properties": {
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "split": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "train",
+                  "val"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split"
+          },
+          "removed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Removed"
+          }
+        },
+        "type": "object",
+        "title": "ImageChange"
+      },
+      "ImageOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "original_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "split": {
+            "type": "string",
+            "title": "Split"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "guild_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Guild Id"
+          },
+          "channel_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel Id"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "added_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added By"
+          },
+          "added_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Added At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "removed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Removed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "dataset",
+          "content_hash",
+          "original_name",
+          "label",
+          "split",
+          "source",
+          "guild_id",
+          "channel_id",
+          "message_id",
+          "added_by",
+          "added_at",
+          "updated_at",
+          "removed_at"
+        ],
+        "title": "ImageOut"
+      },
+      "JailStatsOut": {
+        "properties": {
+          "most_jailed": {
+            "items": {
+              "$ref": "#/components/schemas/Count"
+            },
+            "type": "array",
+            "title": "Most Jailed"
+          },
+          "tomatoes": {
+            "items": {
+              "$ref": "#/components/schemas/TomatoRow"
+            },
+            "type": "array",
+            "title": "Tomatoes"
+          },
+          "pending_renames": {
+            "items": {
+              "$ref": "#/components/schemas/RenameRow"
+            },
+            "type": "array",
+            "title": "Pending Renames"
+          }
+        },
+        "type": "object",
+        "required": [
+          "most_jailed",
+          "tomatoes",
+          "pending_renames"
+        ],
+        "title": "JailStatsOut"
+      },
+      "LabelCount": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "train": {
+            "type": "integer",
+            "title": "Train"
+          },
+          "val": {
+            "type": "integer",
+            "title": "Val"
+          },
+          "removed": {
+            "type": "integer",
+            "title": "Removed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "train",
+          "val",
+          "removed"
+        ],
+        "title": "LabelCount"
+      },
+      "LedgerPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LedgerRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kinds"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "kinds"
+        ],
+        "title": "LedgerPage"
+      },
+      "LedgerRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "from_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From User Id"
+          },
+          "to_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To User Id"
+          },
+          "from_shadow": {
+            "type": "boolean",
+            "title": "From Shadow"
+          },
+          "to_shadow": {
+            "type": "boolean",
+            "title": "To Shadow"
+          },
+          "actor_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor User Id"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "thread_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "kind",
+          "amount",
+          "from_user_id",
+          "to_user_id",
+          "from_shadow",
+          "to_shadow",
+          "actor_user_id",
+          "message_id",
+          "thread_id"
+        ],
+        "title": "LedgerRow"
+      },
+      "LineOut": {
+        "properties": {
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "from_file": {
+            "type": "boolean",
+            "title": "From File"
+          },
+          "added_by": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added By"
+          },
+          "added_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added At"
+          },
+          "edited_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Edited At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "index",
+          "text",
+          "from_file",
+          "added_by",
+          "added_at",
+          "edited_at"
+        ],
+        "title": "LineOut"
+      },
+      "ManifestoOut": {
+        "properties": {
+          "author_ids": {
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "type": "array",
+            "title": "Author Ids"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/LineOut"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "author_ids",
+          "lines"
+        ],
+        "title": "ManifestoOut"
+      },
+      "MarketDetailOut": {
+        "properties": {
+          "market": {
+            "$ref": "#/components/schemas/MarketRowOut"
+          },
+          "bets": {
+            "items": {
+              "$ref": "#/components/schemas/BetOut"
+            },
+            "type": "array",
+            "title": "Bets"
+          },
+          "totals": {
+            "items": {
+              "$ref": "#/components/schemas/ChoiceTotal"
+            },
+            "type": "array",
+            "title": "Totals"
+          },
+          "ledger": {
+            "items": {
+              "$ref": "#/components/schemas/LedgerRow"
+            },
+            "type": "array",
+            "title": "Ledger"
+          },
+          "auto_bet": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutoBetOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "market",
+          "bets",
+          "totals",
+          "ledger",
+          "auto_bet"
+        ],
+        "title": "MarketDetailOut"
+      },
+      "MarketRowOut": {
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Thread Id"
+          },
+          "creator_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Creator Id"
+          },
+          "admin_ids": {
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "type": "array",
+            "title": "Admin Ids"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Choices"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "winning_choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Winning Choice"
+          },
+          "pool": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "bets": {
+            "type": "integer",
+            "title": "Bets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "thread_id",
+          "creator_id",
+          "admin_ids",
+          "status",
+          "choices",
+          "created_at",
+          "resolved_at",
+          "winning_choice",
+          "pool",
+          "bets"
+        ],
+        "title": "MarketRowOut"
+      },
+      "MemberRow": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "in_guild": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "In Guild"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "shadow_balance": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "jailed": {
+            "type": "boolean",
+            "title": "Jailed"
+          },
+          "vip": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Vip"
+          },
+          "times_jailed": {
+            "type": "integer",
+            "title": "Times Jailed"
+          },
+          "tomatoes_received": {
+            "type": "integer",
+            "title": "Tomatoes Received"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "in_guild",
+          "balance",
+          "shadow_balance",
+          "jailed",
+          "vip",
+          "times_jailed",
+          "tomatoes_received"
+        ],
+        "title": "MemberRow"
+      },
+      "Meta": {
+        "properties": {
+          "bot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BotUser"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "connected": {
+            "type": "boolean",
+            "title": "Connected"
+          },
+          "house_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "House User Id"
+          },
+          "uptime_seconds": {
+            "type": "number",
+            "title": "Uptime Seconds"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "currencies": {
+            "items": {
+              "$ref": "#/components/schemas/CurrencyUnit"
+            },
+            "type": "array",
+            "title": "Currencies"
+          },
+          "cogs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cogs"
+          },
+          "classifier_loaded": {
+            "type": "boolean",
+            "title": "Classifier Loaded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bot",
+          "connected",
+          "house_user_id",
+          "uptime_seconds",
+          "latency_ms",
+          "timezone",
+          "currencies",
+          "cogs",
+          "classifier_loaded"
+        ],
+        "title": "Meta"
+      },
+      "ModelInfo": {
+        "properties": {
+          "loaded": {
+            "type": "boolean",
+            "title": "Loaded"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loaded",
+          "source",
+          "labels"
+        ],
+        "title": "ModelInfo"
+      },
+      "OnePercentOut": {
+        "properties": {
+          "holder_user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Holder User Id"
+          },
+          "paid": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "claimed_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Claimed At"
+          },
+          "henchman_user_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Henchman User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "holder_user_id",
+          "paid",
+          "claimed_at",
+          "henchman_user_id"
+        ],
+        "title": "OnePercentOut"
+      },
+      "Page_BirthdayOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/BirthdayOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "Page[BirthdayOut]"
+      },
+      "Page_GuessOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/GuessOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "Page[GuessOut]"
+      },
+      "Page_HeistOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HeistOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "Page[HeistOut]"
+      },
+      "Page_HolidayOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HolidayOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "Page[HolidayOut]"
+      },
+      "Page_ImageOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ImageOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "Page[ImageOut]"
+      },
+      "Page_MarketRowOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MarketRowOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "Page[MarketRowOut]"
+      },
+      "Page_PassOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PassOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "Page[PassOut]"
+      },
+      "Page_PollOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PollOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "Page[PollOut]"
+      },
+      "Page_PostOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PostOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "Page[PostOut]"
+      },
+      "Page_RunSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "Page[RunSummary]"
+      },
+      "Page_SentenceRow_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SentenceRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "Page[SentenceRow]"
+      },
+      "PassOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "started_at",
+          "ends_at",
+          "ended_at"
+        ],
+        "title": "PassOut"
+      },
+      "PocketResult": {
+        "properties": {
+          "balance": {
+            "$ref": "#/components/schemas/Amount"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "balance",
+          "message"
+        ],
+        "title": "PocketResult"
+      },
+      "PollOut": {
+        "properties": {
+          "poll_message_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Poll Message Id"
+          },
+          "channel_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Channel Id"
+          },
+          "initiator_user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Initiator User Id"
+          },
+          "adjective": {
+            "type": "string",
+            "title": "Adjective"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "poll_message_id",
+          "channel_id",
+          "initiator_user_id",
+          "adjective",
+          "created_at",
+          "active"
+        ],
+        "title": "PollOut"
+      },
+      "PostOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "bet": {
+            "type": "string",
+            "title": "Bet"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Values"
+          },
+          "round": {
+            "type": "integer",
+            "title": "Round"
+          },
+          "thread_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Thread Id"
+          },
+          "posted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Posted At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "bet",
+          "text",
+          "values",
+          "round",
+          "thread_id",
+          "posted_at"
+        ],
+        "title": "PostOut"
+      },
+      "Posted": {
+        "properties": {
+          "thread_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Thread Id"
+          },
+          "jump_url": {
+            "type": "string",
+            "title": "Jump Url"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "thread_id",
+          "jump_url",
+          "message"
+        ],
+        "title": "Posted"
+      },
+      "Progress": {
+        "properties": {
+          "running": {
+            "type": "boolean",
+            "title": "Running"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "running",
+          "done",
+          "total"
+        ],
+        "title": "Progress"
+      },
+      "RenameRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "prompt_message_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Prompt Message Id"
+          },
+          "target_user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Target User Id"
+          },
+          "offending_message_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Offending Message Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "prompt_message_id",
+          "target_user_id",
+          "offending_message_id"
+        ],
+        "title": "RenameRow"
+      },
+      "RunDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "triggered_by": {
+            "type": "string",
+            "title": "Triggered By"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "train_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Train Count"
+          },
+          "val_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Val Count"
+          },
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "log_loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log Loss"
+          },
+          "results": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "dataset",
+          "status",
+          "triggered_by",
+          "started_at",
+          "finished_at",
+          "error",
+          "train_count",
+          "val_count",
+          "accuracy",
+          "log_loss",
+          "results"
+        ],
+        "title": "RunDetail"
+      },
+      "RunSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "triggered_by": {
+            "type": "string",
+            "title": "Triggered By"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "train_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Train Count"
+          },
+          "val_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Val Count"
+          },
+          "accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accuracy"
+          },
+          "log_loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Log Loss"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "dataset",
+          "status",
+          "triggered_by",
+          "started_at",
+          "finished_at",
+          "error",
+          "train_count",
+          "val_count",
+          "accuracy",
+          "log_loss"
+        ],
+        "title": "RunSummary"
+      },
+      "Said": {
+        "properties": {
+          "jump_url": {
+            "type": "string",
+            "title": "Jump Url"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jump_url",
+          "message"
+        ],
+        "title": "Said"
+      },
+      "Say": {
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Channel Id"
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel_id",
+          "message"
+        ],
+        "title": "Say"
+      },
+      "SentenceRow": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "channel_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Channel Id"
+          },
+          "offending_message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[0-9]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offending Message Id"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ends_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ends At"
+          },
+          "released_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Released At"
+          },
+          "release_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Release Reason"
+          },
+          "humiliated": {
+            "type": "boolean",
+            "title": "Humiliated"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "channel_id",
+          "offending_message_id",
+          "started_at",
+          "ends_at",
+          "released_at",
+          "release_reason",
+          "humiliated",
+          "reason"
+        ],
+        "title": "SentenceRow"
+      },
+      "SnipeOut": {
+        "properties": {
+          "message_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Message Id"
+          },
+          "channel_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Channel Id"
+          },
+          "sniper_user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Sniper User Id"
+          },
+          "target_user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Target User Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "votes_for": {
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "type": "array",
+            "title": "Votes For"
+          },
+          "votes_against": {
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "type": "array",
+            "title": "Votes Against"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message_id",
+          "channel_id",
+          "sniper_user_id",
+          "target_user_id",
+          "status",
+          "created_at",
+          "decided_at",
+          "votes_for",
+          "votes_against"
+        ],
+        "title": "SnipeOut"
+      },
+      "SnipesOut": {
+        "properties": {
+          "council": {
+            "items": {
+              "$ref": "#/components/schemas/CouncilMember"
+            },
+            "type": "array",
+            "title": "Council"
+          },
+          "nay_emoji": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nay Emoji"
+          },
+          "majority": {
+            "type": "integer",
+            "title": "Majority"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SnipeOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "council",
+          "nay_emoji",
+          "majority",
+          "items",
+          "total"
+        ],
+        "title": "SnipesOut"
+      },
+      "Started": {
+        "properties": {
+          "run_id": {
+            "type": "integer",
+            "title": "Run Id"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "message"
+        ],
+        "title": "Started"
+      },
+      "Synced": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "message"
+        ],
+        "title": "Synced"
+      },
+      "Target": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id"
+        ],
+        "title": "Target"
+      },
+      "TomatoRow": {
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "thrown": {
+            "type": "integer",
+            "title": "Thrown"
+          },
+          "received": {
+            "type": "integer",
+            "title": "Received"
+          },
+          "at_innocents": {
+            "type": "integer",
+            "title": "At Innocents"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user_id",
+          "thrown",
+          "received",
+          "at_innocents"
+        ],
+        "title": "TomatoRow"
+      },
+      "Uploaded": {
+        "properties": {
+          "image": {
+            "$ref": "#/components/schemas/ImageOut"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "title": "Duplicate"
+          }
+        },
+        "type": "object",
+        "required": [
+          "image",
+          "duplicate"
+        ],
+        "title": "Uploaded"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VipOut": {
+        "properties": {
+          "one_percent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OnePercentOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next_price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Amount"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "passes": {
+            "items": {
+              "$ref": "#/components/schemas/PassOut"
+            },
+            "type": "array",
+            "title": "Passes"
+          },
+          "history": {
+            "$ref": "#/components/schemas/Page_PassOut_"
+          }
+        },
+        "type": "object",
+        "required": [
+          "one_percent",
+          "next_price",
+          "passes",
+          "history"
+        ],
+        "title": "VipOut"
+      },
+      "VisitOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "visited_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Visited At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "visited_at"
+        ],
+        "title": "VisitOut"
+      },
+      "WisdomText": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "WisdomText"
+      }
+    }
+  }
+}

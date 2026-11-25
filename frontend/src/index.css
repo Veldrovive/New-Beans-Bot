@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-stone-100 text-stone-900 antialiased;
+  }
+  a {
+    @apply text-amber-800 hover:underline;
+  }
+}

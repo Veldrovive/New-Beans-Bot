@@ -23,9 +23,10 @@ from beans_bot.cogs.role_name import RoleNameCog
 from beans_bot.cogs.snipes import SnipesCog
 from beans_bot.cogs.tomatoes import TomatoesCog
 from beans_bot.cogs.vip import VipCog
+from beans_bot.cogs.web import WebCog
 from beans_bot.config.schema import BotConfig, GuildConfig
 
-COGS = (BasicCog, AdminCog, RoleNameCog, JailCog, TomatoesCog, CoinsCog, GamblingCog, AutoBetsCog, FatCowCog, BirthdayCog, ActionHolidayCog, VipCog, SnipesCog, ManifestoCog, HeistCog)
+COGS = (BasicCog, AdminCog, RoleNameCog, JailCog, TomatoesCog, CoinsCog, GamblingCog, AutoBetsCog, FatCowCog, BirthdayCog, ActionHolidayCog, VipCog, SnipesCog, ManifestoCog, HeistCog, WebCog)
 
 
 async def test_commands_register(tmp_path: Path):

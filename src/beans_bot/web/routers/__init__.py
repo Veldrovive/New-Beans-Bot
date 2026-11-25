@@ -1,0 +1,42 @@
+"""One router per page of the website. ROUTERS is the order app.py includes them in."""
+
+from beans_bot.web.routers import (
+    auto_bets,
+    bot_actions,
+    classifier,
+    coins,
+    config_view,
+    daily_posts,
+    directory,
+    fat_cow,
+    heists,
+    jail,
+    manifestos,
+    markets,
+    members,
+    meta,
+    role_polls,
+    snipes,
+    vip,
+)
+
+ROUTERS = [
+    meta.router,
+    directory.router,
+    members.router,
+    coins.router,
+    jail.router,
+    markets.router,
+    auto_bets.router,
+    vip.router,
+    snipes.router,
+    heists.router,
+    manifestos.router,
+    daily_posts.router,
+    fat_cow.router,
+    role_polls.router,
+    classifier.guild_router,
+    classifier.router,
+    config_view.router,
+    bot_actions.router,
+]

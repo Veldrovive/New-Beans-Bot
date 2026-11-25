@@ -48,8 +48,10 @@ class AutoBetsCog(BeansCog):
         ]
         for job in self.jobs:
             job.start()
+        self.services.auto_bets.poster = self.post
 
     async def cog_unload(self):
+        self.services.auto_bets.poster = None
         for job in self.jobs:
             job.stop()
 

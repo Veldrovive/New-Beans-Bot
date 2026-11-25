@@ -1,29 +1,32 @@
 """
-Retraining a classifier while the bot runs.
+Retraining a classifier while the bot runs, and scoring it.
 
-- The original training photos aren't on the server, so scripts/train_classifier.py saves their
-  embeddings next to each model as <model>_training.pkl.
-- A retrain starts from those embeddings and adds every photo members have confirmed or corrected.
+- A retrain uses every photo in the dataset that isn't removed (see services/classifier.py). It trains
+  on the "train" photos and scores the new model on the "val" photos: accuracy, log loss, a confusion
+  matrix, precision and recall per label, and every val photo's probabilities.
+- Embeddings are cached by the photo's content hash, so a retrain only embeds new photos.
 - The new model is saved apart from the one that ships with the bot, which is left untouched.
+- scripts/train_classifier.py still saves <model>_training.pkl with TrainingSet; the bot no longer reads it.
 """
 
 from __future__ import annotations
 
-import hashlib
-import io
 import logging
+import os
 import pickle
 from collections import Counter
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 import numpy as np
 from PIL import Image
 from pillow_heif import register_heif_opener
+from sklearn.metrics import log_loss as sklearn_log_loss
 
 from beans_bot.cogs.classifier.dino import Classifier
-from beans_bot.services.classifier import RetrainResult
+from beans_bot.services.classifier import RetrainFailed
 
 logger = logging.getLogger(__name__)
 
@@ -58,45 +61,124 @@ def load_training_set(base_path: Path) -> TrainingSet:
         return TrainingSet(**pickle.load(f))
 
 
-def retrain(name: str, extractor: FeatureExtractor, base_path: Path, corrections_dir: Path, output_path: Path, cache_path: Path) -> tuple[Classifier, RetrainResult]:
-    """
-    Trains a model on the training set saved at `base_path` plus the photos in `corrections_dir/<label>/`,
-    and saves it at `output_path`. Slow, so call it from a thread.
-    """
-    base = load_training_set(base_path)
-    cache: dict[str, np.ndarray] = pickle.loads(cache_path.read_bytes()) if cache_path.exists() else {}
-    rows, labels = list(base.X), list(base.labels)
-    # A corrected photo that was later copied into the dataset would otherwise count twice.
-    seen = set(base.hashes)
-    added = skipped = 0
-    label_dirs = sorted(p for p in corrections_dir.iterdir() if p.is_dir()) if corrections_dir.is_dir() else []
-    for label_dir in label_dirs:
-        for path in sorted(label_dir.iterdir()):
-            if not path.is_file() or path.name[0] in "_.":
-                continue
-            data = path.read_bytes()
-            key = hashlib.md5(data).hexdigest()
-            if key in seen:
-                continue
-            try:
-                if key not in cache:
-                    cache[key] = extractor.extract_features(Image.open(io.BytesIO(data)).convert("RGB")).squeeze()
-            except Exception:
-                # Members can upload anything with an image content type.
-                logger.exception(f"Skipping unreadable photo {path}")
-                skipped += 1
-                continue
-            seen.add(key)
-            rows.append(cache[key])
-            labels.append(label_dir.name)
-            added += 1
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    cache_path.write_bytes(pickle.dumps(cache))
+@dataclass
+class TrainingImage:
+    """One stored photo, without the database model, so this module doesn't need the DB."""
 
-    names = sorted(set(labels))
-    label_to_index = {label: i for i, label in enumerate(names)}
+    id: int
+    path: Path
+    label: str
+    split: str  # "train" or "val"
+    content_hash: str
+
+
+@dataclass
+class RunResults:
+    train_count: int
+    val_count: int  # Val photos that were scored (their label has train photos)
+    accuracy: float | None  # None when there were no val photos to score
+    log_loss: float | None
+    results: dict[str, Any] = field(default_factory=dict)  # Plain JSON, stored on the training run
+
+
+def load_cache(cache_path: Path) -> dict[str, np.ndarray]:
+    if not cache_path.exists():
+        return {}
+    cache = pickle.loads(cache_path.read_bytes())
+    return {key: np.asarray(value).squeeze() for key, value in cache.items()}
+
+
+def save_cache(cache_path: Path, cache: dict[str, np.ndarray]) -> None:
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    partial = cache_path.with_suffix(".tmp")
+    partial.write_bytes(pickle.dumps(cache))
+    os.replace(partial, cache_path)  # A crash mid-write never leaves half a cache
+
+
+def train_and_evaluate(
+    extractor: FeatureExtractor,
+    images: list[TrainingImage],
+    output_path: Path,
+    cache_path: Path,
+    progress: Callable[[int, int], None] | None = None,
+) -> tuple[Classifier, RunResults]:
+    """
+    Train on the train photos, score on the val photos and save the model at `output_path`. Slow, so call
+    it from a thread. Raises RetrainFailed when there's nothing to learn from.
+    """
+    cache = load_cache(cache_path)
+    embeddings: dict[int, np.ndarray] = {}
+    skipped: list[int] = []
+    for done, image in enumerate(images, start=1):
+        try:
+            if image.content_hash not in cache:
+                with Image.open(image.path) as opened:
+                    cache[image.content_hash] = np.asarray(extractor.extract_features(opened.convert("RGB"))).squeeze()
+            embeddings[image.id] = cache[image.content_hash]
+        except Exception:
+            logger.exception(f"Skipping unreadable photo {image.id} ({image.path})")
+            skipped.append(image.id)
+        if progress is not None:
+            progress(done, len(images))
+    save_cache(cache_path, cache)
+
+    train = [i for i in images if i.split == "train" and i.id in embeddings]
+    labels = sorted({i.label for i in train})
+    if not train or len(labels) < 2:
+        raise RetrainFailed(f"I need train photos of at least two labels to learn anything. I have {len(train)} photos of {len(labels)}.")
+    index = {label: n for n, label in enumerate(labels)}
     classifier = Classifier()
-    classifier.train(np.array(rows), np.array([label_to_index[label] for label in labels]), label_to_index)
+    classifier.train(np.array([embeddings[i.id] for i in train]), np.array([index[i.label] for i in train]), index)
+
+    val = [i for i in images if i.split == "val" and i.id in embeddings]
+    scored = [i for i in val if i.label in index]
+    unseen = sorted({i.label for i in val if i.label not in index})
+    n = len(labels)
+    confusion = [[0] * n for _ in range(n)]
+    predictions = []
+    accuracy = loss = None
+    if scored:
+        probabilities = classifier.predict_proba(np.array([embeddings[i.id] for i in scored]))
+        truth = [index[i.label] for i in scored]
+        guesses = [int(np.argmax(p)) for p in probabilities]
+        for image, true, guess, probs in zip(scored, truth, guesses, probabilities):
+            confusion[true][guess] += 1
+            predictions.append(
+                {
+                    "image_id": image.id,
+                    "label": image.label,
+                    "predicted": labels[guess],
+                    "correct": true == guess,
+                    "probabilities": {label: round(float(probs[k]), 4) for k, label in enumerate(labels)},
+                }
+            )
+        accuracy = sum(t == g for t, g in zip(truth, guesses)) / len(scored)
+        loss = float(sklearn_log_loss(truth, probabilities, labels=list(range(n))))
+
+    train_counts = Counter(i.label for i in train)
+    val_counts = Counter(i.label for i in scored)
+    per_label = {}
+    for k, label in enumerate(labels):
+        hits = confusion[k][k]
+        predicted = sum(confusion[row][k] for row in range(n))
+        per_label[label] = {
+            "train": train_counts[label],
+            "val": val_counts[label],
+            "precision": hits / predicted if predicted else None,
+            "recall": hits / val_counts[label] if val_counts[label] else None,
+        }
     classifier.save(output_path)
-    counts = Counter(labels)
-    return classifier, RetrainResult(name=name, counts={label: counts[label] for label in names}, added=added, skipped=skipped)
+    return classifier, RunResults(
+        train_count=len(train),
+        val_count=len(scored),
+        accuracy=accuracy,
+        log_loss=loss,
+        results={
+            "labels": labels,
+            "per_label": per_label,
+            "confusion": confusion,
+            "predictions": predictions,
+            "skipped": skipped,
+            "unseen_val_labels": unseen,
+        },
+    )
