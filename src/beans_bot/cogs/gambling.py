@@ -8,7 +8,8 @@ automatic bets itself (see cogs/auto_bets.py), and their admins manage them.
   @everyone in the bot channel and sends them to jail.
 - If only the house lost, soon after the market opened, the winners are refunded
   instead of paid, and go to jail where they can't bet.
-- The house's bet is a secret. /bet stats leaves it out, and it's revealed when the market resolves.
+- The house's bet is a secret by default (`bot_betting.secret`). /bet stats leaves it out, and it's
+  revealed when the market resolves. With `secret: false` the bot announces it and stats count it.
 """
 
 from __future__ import annotations
@@ -27,7 +28,8 @@ from beans_bot.services import scripts
 from beans_bot.services.errors import UserFacingError
 from beans_bot.services.jail import JailOutcome
 from beans_bot.services.markets import (
-    SECRET_BET_ANNOUNCEMENT,
+    house_bet_announcement,
+    house_bet_is_secret,
     InvalidMarket,
     Resolution,
     market_instructions,
@@ -71,13 +73,14 @@ class GamblingCog(BeansCog):
         await self.services.markets.create(
             guild_id=thread.guild.id, thread_id=thread.id, creator_id=starter.author.id, choices=choices
         )
-        await thread.send(market_instructions(choices, [starter.author.id]))
+        secret = config.gambling.bot_betting.secret
+        await thread.send(market_instructions(choices, [starter.author.id], secret_house_bet=secret))
 
         amount = await self.services.markets.auto_bet_amount(thread.guild.id, config.gambling.bot_betting)
         if amount is not None:
             choice = random.choice(choices)
             await self.services.markets.house_bet(thread.id, choice, amount)
-            await thread.send(SECRET_BET_ANNOUNCEMENT)
+            await thread.send(house_bet_announcement(secret, choice, self.services.currency.format(amount)))
 
     @BeansCog.listener()
     async def on_raw_thread_delete(self, payload: discord.RawThreadDeleteEvent):
@@ -206,7 +209,8 @@ class GamblingCog(BeansCog):
     @bet.command(name="stats", description="Show this market's pool and odds.")
     @app_commands.describe(quiet=QUIET_HELP)
     async def stats(self, interaction: discord.Interaction, quiet: bool = False):
-        stats = await self.services.markets.stats(self._thread_id(interaction))
+        secret = house_bet_is_secret(self.guild_config(interaction.guild_id))
+        stats = await self.services.markets.stats(self._thread_id(interaction), include_house=not secret)
         if stats.pool == 0:
             await interaction.response.send_message("No bets have been placed yet.", ephemeral=quiet)
             return
@@ -217,7 +221,8 @@ class GamblingCog(BeansCog):
                 lines.append(f"- **{choice}**: nothing bet (No payout)")
             else:
                 lines.append(f"- **{choice}**: {currency.format(total)} bet (Payout ratio: {stats.pool / total:.2f}x)")
-        lines.append("-# Members' bets only. If I bet, it's a secret until this resolves, so the real odds are anyone's guess.")
+        if secret:
+            lines.append("-# Members' bets only. If I bet, it's a secret until this resolves, so the real odds are anyone's guess.")
         await interaction.response.send_message("\n".join(lines), ephemeral=quiet)
 
     @bet.command(name="close", description="Market manager: stop accepting bets without naming a winner yet.")
@@ -253,16 +258,16 @@ class GamblingCog(BeansCog):
             lines += [f"- <@{user_id}>: {currency.format(amount)}" for user_id, amount in resolution.payouts]
             lines.append(f"And the house took {currency.format(resolution.house_remainder)}.")
             text = "\n".join(lines)
-        if reveal := self._reveal_house_bet(resolution):
+        if reveal := self._reveal_house_bet(resolution, house_bet_is_secret(config)):
             text += f"\n{reveal}"
         await interaction.response.send_message(text)
 
-    def _reveal_house_bet(self, resolution: Resolution) -> str | None:
+    def _reveal_house_bet(self, resolution: Resolution, secret: bool = True) -> str | None:
         if resolution.house_bet is None:
             return None
         choice, amount = resolution.house_bet
         verdict = "Called it." if choice == resolution.winning_choice else "Don't tell anyone."
-        return f"My secret bet: {self.services.currency.format(amount)} on **{choice}**. {verdict}"
+        return f"My {'secret ' if secret else ''}bet: {self.services.currency.format(amount)} on **{choice}**. {verdict}"
 
     resolve.autocomplete("winner")(_choice_autocomplete)
 

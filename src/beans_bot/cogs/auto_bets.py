@@ -22,7 +22,7 @@ from beans_bot.cogs.base import BeansCog, admin_only
 from beans_bot.services import scripts
 from beans_bot.services.auto_bets import load_bets
 from beans_bot.services.errors import UserFacingError
-from beans_bot.services.markets import SECRET_BET_ANNOUNCEMENT, market_instructions
+from beans_bot.services.markets import house_bet_announcement, house_bet_is_secret, market_instructions
 from beans_bot.services.scheduling import DailyJob
 
 
@@ -98,7 +98,8 @@ class AutoBetsCog(BeansCog):
             raise UserFacingError("Discord wouldn't let me open the thread. The bet is off.") from e
 
         await self.services.auto_bets.record(guild.id, draw, thread_id=thread.id, creator_id=self.bot.user.id)
-        await thread.send(market_instructions(draw.bet.choices, draw.bet.admins))
+        secret = house_bet_is_secret(config)
+        await thread.send(market_instructions(draw.bet.choices, draw.bet.admins, secret_house_bet=secret))
 
         if draw.bet.bot_bet is not None:
             amount = self.services.auto_bets.bot_bet_amount(draw.bet)
@@ -107,7 +108,7 @@ class AutoBetsCog(BeansCog):
         if amount is not None:
             choice = random.choice(draw.bet.choices)
             await self.services.markets.house_bet(thread.id, choice, amount)
-            await thread.send(SECRET_BET_ANNOUNCEMENT)
+            await thread.send(house_bet_announcement(secret, choice, self.services.currency.format(amount)))
         return thread
 
     # --- /autobet -----------------------------------------------------------------------

@@ -133,6 +133,9 @@ class CoinsConfig(StrictModel):
 
 class BotBettingConfig(StrictModel):
     enabled: bool = False
+    # True: the house's bet stays hidden (left out of /bet stats) until the market resolves.
+    # False: the bot says what it bet on, and how much, as soon as it bets, and /bet stats counts it.
+    secret: bool = True
     bet_probability: float = 0.5
     bet_proportion: float = 0.1
     max_bet: CoinAmount = parse_amount(50)

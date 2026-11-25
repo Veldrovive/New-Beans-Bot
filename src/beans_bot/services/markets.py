@@ -10,8 +10,9 @@ The cog makes them pay for it with jail and an @everyone.
   one that lost, the winners were just taking the bot's money, alone or as a
   gang. Everyone gets their own stake back, and the cog jails every winner.
 - Members jailed for rigging can't place or add to bets. Nobody in jail can swap.
-- The house's bet is a secret until the market resolves: stats leave it out, and the
-  resolution reveals it. Scammers have to guess which side to rob.
+- With `bot_betting.secret` (the default), the house's bet is a secret until the market resolves:
+  stats leave it out, and the resolution reveals it. Scammers have to guess which side to rob.
+  Without it, the bot announces its bet and stats count it.
 - Admins can nullify a resolved market: everything it paid out is taken back, even if that
   puts members in debt, and every stake is refunded, as if it had been canceled.
 - The admin site can bet for the house, and close, cancel or nullify any market without being
@@ -28,7 +29,7 @@ from dataclasses import dataclass, field
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from beans_bot.config.schema import BotBettingConfig
+from beans_bot.config.schema import BotBettingConfig, GuildConfig
 from beans_bot.currency import CurrencySystem
 from beans_bot.db.engine import Database
 from beans_bot.db.models import CoinTransaction, CoinTransactionKind, JailReason, MarketBet, MarketStatus, PredictionMarket
@@ -45,6 +46,19 @@ FINISHED = (MarketStatus.RESOLVED, MarketStatus.CANCELED, MarketStatus.NULLIFIED
 SECRET_BET_ANNOUNCEMENT = (
     "I am joining the fray! What did I bet, and on what? That's between me and the beans. You'll find out when it resolves."
 )
+
+
+def house_bet_is_secret(guild_config: GuildConfig | None) -> bool:
+    """Whether the guild keeps the house's bets secret until resolution (the default)."""
+    gambling = guild_config.gambling if guild_config is not None else None
+    return gambling.bot_betting.secret if gambling is not None else True
+
+
+def house_bet_announcement(secret: bool, choice: str, amount: str) -> str:
+    """What the bot posts in a market thread when it bets. `amount` is already formatted."""
+    if secret:
+        return SECRET_BET_ANNOUNCEMENT
+    return f"I am joining the fray! I bet {amount} on {choice}!"
 
 
 class InvalidMarket(UserFacingError):
@@ -82,7 +96,7 @@ def parse_choices(content: str) -> list[str]:
     return choices
 
 
-def market_instructions(choices: list[str], manager_ids: list[int]) -> str:
+def market_instructions(choices: list[str], manager_ids: list[int], secret_house_bet: bool = True) -> str:
     """The how-to the bot posts in a new market thread."""
     lines = ["Time to gamble!", "", "Place a bet with `/bet place`:"]
     lines += [f"- `/bet place choice:{choice} amount:<coins>`" for choice in choices]
@@ -91,8 +105,14 @@ def market_instructions(choices: list[str], manager_ids: list[int]) -> str:
         "However, if you want to lose more money you can use `/bet add` to increase your bet.",
         "Changed your mind? `/bet swap` moves your whole bet, but it tells @everyone and sends you to jail.",
         "If I'm the only loser and it resolves right away, I'll assume you cheated, and cheaters don't bet from jail.",
-        "I might have a secret bet in here too. You'll find out what it was when it resolves.",
-        "Check the pool and odds (my bet not included): `/bet stats`",
+        *(
+            [
+                "I might have a secret bet in here too. You'll find out what it was when it resolves.",
+                "Check the pool and odds (my bet not included): `/bet stats`",
+            ]
+            if secret_house_bet
+            else ["Check the pool and odds: `/bet stats`"]
+        ),
         "",
         f"Commands for the prediction market manager{'s' if len(manager_ids) > 1 else ''}, {', '.join(f'<@{m}>' for m in manager_ids)}:",
         "- Close betting and refund everyone: `/bet cancel`",
@@ -213,12 +233,12 @@ class MarketService:
         async with self.db.transaction() as session:
             return await session.get(PredictionMarket, thread_id)
 
-    async def stats(self, thread_id: int) -> MarketStats:
+    async def stats(self, thread_id: int, include_house: bool = False) -> MarketStats:
         async with self.db.transaction() as session:
             market = await self._market(session, thread_id)
             by_choice = {c: 0 for c in market.choices}
             for bet in await self._bets(session, thread_id):
-                if bet.user_id == self.coins.house_user_id:
+                if bet.user_id == self.coins.house_user_id and not include_house:
                     continue  # The house's bet is a secret until the market resolves
                 by_choice[bet.choice] = by_choice.get(bet.choice, 0) + bet.amount
             return MarketStats(pool=sum(by_choice.values()), by_choice=by_choice)

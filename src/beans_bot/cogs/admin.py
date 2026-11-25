@@ -3,7 +3,7 @@ Admin tools, for server admins. Every reply here is ephemeral, so nobody sees wh
 - /admin say posts a message as the bot in a channel.
 - /admin dm sends a member a DM from the bot.
 - /admin botbet has the bot (the house) bet in a prediction market thread, after a confirm button.
-  Like every house bet, it's a secret until the market resolves.
+  Like every house bet, it's a secret until the market resolves, unless `bot_betting.secret` is off.
 - /admin nullifybet undoes a resolved market: payouts are taken back (into debt if they were
   spent) and every stake is refunded. The thread hears about it, but not who did it.
 - /admin give and /admin take add or remove a member's coins or ShadowBeans. The house is the
@@ -26,7 +26,7 @@ from beans_bot.db.models import ClassifierTrainingRun
 from beans_bot.services.classifier import RetrainFailed, RetrainInProgress
 from beans_bot.services.coins import InsufficientFunds
 from beans_bot.services.errors import UserFacingError
-from beans_bot.services.markets import SECRET_BET_ANNOUNCEMENT, nullification_announcement
+from beans_bot.services.markets import house_bet_announcement, house_bet_is_secret, nullification_announcement
 
 # Discord's message length limit.
 MessageText = app_commands.Range[str, 1, 2000]
@@ -50,7 +50,7 @@ class ConfirmBotBet(discord.ui.View):
     async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.stop()
         try:
-            await self.cog.services.markets.house_bet(self.thread_id, self.choice, self.amount)
+            bet = await self.cog.services.markets.house_bet(self.thread_id, self.choice, self.amount)
         except UserFacingError as e:
             await interaction.response.edit_message(content=str(e), view=None)
             return
@@ -61,7 +61,8 @@ class ConfirmBotBet(discord.ui.View):
         thread = self.cog.bot.get_channel(self.thread_id)
         if isinstance(thread, discord.Thread):
             try:
-                await thread.send(SECRET_BET_ANNOUNCEMENT)
+                secret = house_bet_is_secret(self.cog.guild_config(interaction.guild_id))
+                await thread.send(house_bet_announcement(secret, bet.choice, self.cog.services.currency.format(bet.amount)))
             except discord.HTTPException:
                 self.cog.logger.warning(f"Could not announce the house bet in market {self.thread_id}")
 

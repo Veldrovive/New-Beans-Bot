@@ -294,6 +294,32 @@ async def test_stats_hide_the_house_bet(markets, coins, db, market):
     assert (stats.pool, stats.by_choice) == (100, {"yes": 0, "no": 100})
 
 
+async def test_stats_can_include_the_house_bet(markets, coins, db, market):
+    await markets.house_bet(THREAD, "yes", 500)
+    await fund(coins, db, 1, 100)
+    await markets.place_bet(THREAD, 1, "no", 100)
+
+    stats = await markets.stats(THREAD, include_house=True)
+    assert (stats.pool, stats.by_choice) == (600, {"yes": 500, "no": 100})
+
+
+def test_house_bet_announcement_secret_or_public():
+    from beans_bot.services.markets import SECRET_BET_ANNOUNCEMENT, house_bet_announcement, market_instructions
+
+    assert house_bet_announcement(True, "yes", "5") == SECRET_BET_ANNOUNCEMENT
+    assert house_bet_announcement(False, "yes", "5") == "I am joining the fray! I bet 5 on yes!"
+    assert "secret bet" in market_instructions(["yes", "no"], [1])
+    assert "secret" not in market_instructions(["yes", "no"], [1], secret_house_bet=False)
+
+
+def test_house_bet_is_secret_by_default():
+    from beans_bot.config.schema import BotBettingConfig
+    from beans_bot.services.markets import house_bet_is_secret
+
+    assert BotBettingConfig().secret is True
+    assert house_bet_is_secret(None) is True
+
+
 async def test_resolution_reveals_the_house_bet(markets, coins, db, market):
     await markets.house_bet(THREAD, "yes", 400)
     await fund(coins, db, 1, 100)

@@ -1,4 +1,4 @@
-"""Prediction markets: the list, and one market with every bet, the house's secret one included."""
+"""Prediction markets: the list, and one market with every bet, the house's (maybe secret) one included."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import datetime
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from beans_bot.services.markets import SECRET_BET_ANNOUNCEMENT, nullification_announcement
+from beans_bot.services.markets import house_bet_announcement, house_bet_is_secret, nullification_announcement
 from beans_bot.web.actions import actor_user_id, feature, house_id, logger
 from beans_bot.web.context import WebContext
 from beans_bot.web.deps import Actor, Ctx, Guild, Paged
@@ -36,7 +36,7 @@ class BetOut(BaseModel):
     choice: str
     amount: Amount
     placed_at: datetime.datetime
-    secret: bool  # The house's bet, hidden from members until the market resolves
+    secret: bool  # The house's bet, when the guild hides it from members until the market resolves
 
 
 class ChoiceTotal(BaseModel):
@@ -71,12 +71,12 @@ async def markets(guild_id: int, ctx: Ctx, _: Guild, page: Paged, status: str | 
 
 
 @router.get("/{thread_id}")
-async def market(guild_id: int, thread_id: int, ctx: Ctx, _: Guild) -> MarketDetailOut:
+async def market(guild_id: int, thread_id: int, ctx: Ctx, guild: Guild) -> MarketDetailOut:
     currency = ctx.services.currency
     detail = await ctx.services.reports.market_detail(thread_id)
     if detail is None or detail.market.guild_id != guild_id:
         raise not_found(f"There's no market in thread {thread_id} here.")
-    house = ctx.services.coins.house_user_id
+    house = ctx.services.coins.house_user_id if house_bet_is_secret(guild) else None
     m = detail.market
     pool = sum(b.amount for b in detail.bets)
     return MarketDetailOut(
@@ -119,9 +119,11 @@ async def house_bet(guild_id: int, thread_id: int, body: HouseBet, ctx: Ctx, gui
     logger.info(f"Web {actor}: house bets {amount} on {body.choice!r} in market {thread_id} in guild {guild_id}")
     bet = await ctx.services.markets.house_bet(thread_id, body.choice, amount)
     # Same voice as the bot's automatic bets, so it looks like the bot's own idea.
-    posted = await ctx.post(thread_id, SECRET_BET_ANNOUNCEMENT)
     currency = ctx.services.currency
-    return Done(message=f'The house now has {currency.format(bet.amount)} on "{bet.choice}". It stays secret until the market resolves.{_posted(posted)}')
+    secret = house_bet_is_secret(guild)
+    posted = await ctx.post(thread_id, house_bet_announcement(secret, bet.choice, currency.format(bet.amount)))
+    stays = " It stays secret until the market resolves." if secret else ""
+    return Done(message=f'The house now has {currency.format(bet.amount)} on "{bet.choice}".{stays}{_posted(posted)}')
 
 
 @router.post("/{thread_id}/close")
