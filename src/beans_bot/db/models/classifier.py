@@ -106,7 +106,7 @@ class ClassifierTrainingRun(SQLModel, table=True):
 
 class ClassifierDropSession(SQLModel, table=True):
     """
-    A member handing the bot photos of one cat by DM, from /photos drop until they say done or go quiet.
+    A member handing the bot photos of one cat by DM, from /photos drop until /photos done or they go quiet.
     Ending sets ended_at. Rows are never deleted.
     """
 

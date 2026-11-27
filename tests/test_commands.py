@@ -67,7 +67,7 @@ async def test_classifier_commands_register(tmp_path: Path, monkeypatch: pytest.
         names = {c.qualified_name for c in bot.tree.walk_commands()}
         assert {"photos drop", "photos done"} <= names
         photos = bot.tree.get_command("photos")
-        assert photos is not None and photos.guild_only
+        assert photos is not None and not photos.guild_only  # /photos done has to work in the DM
         photos.to_dict(bot.tree)
     finally:
         for name in list(bot.cogs):

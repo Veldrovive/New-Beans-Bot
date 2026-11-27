@@ -10,8 +10,9 @@ channels, or anywhere when someone reacts with the model's trigger emoji.
 - Once someone has decided, the buttons go away. Anyone can still overrule the decision from the
   message's menu: Apps > Override the guess, on the photo or on the bot's reply.
 - Models with a `drop` section take photos by DM. /photos drop name:<cat> opens a session, the member
-  DMs as many photos as they like, and each message gets a tally. It ends when they DM "done", run
-  /photos done, or go quiet for the idle timeout, and the bot DMs a summary.
+  DMs as many photos as they like, and each message gets a tally. The bot opens the DM itself, so the
+  member has somewhere to put them. It ends when they run /photos done (in the DM or the server) or go
+  quiet for the idle timeout, and the bot DMs a summary. A DM that just says "done" ends it too.
 - A retrain (from /admin retrain, the website, or auto retrain) trains a dataset's model on its train photos,
   scores it on its val photos and records both, in a background thread, then swaps the new model in. See
   training.py. Models with an `auto_retrain` section are retrained by a timer once enough photos changed.
@@ -36,7 +37,7 @@ import torch
 from PIL import Image
 from sqlmodel import select
 
-from beans_bot.cogs.base import BeansCog, requires_feature
+from beans_bot.cogs.base import BeansCog, CheckMessage, requires_feature
 from beans_bot.cogs.classifier import training
 from beans_bot.cogs.classifier.dino import Classifier, DinoFeatureExtractor
 from beans_bot.config.schema import ClassifierAutoRetrainConfig, ClassifierDropConfig, ClassifierModelConfig
@@ -63,7 +64,7 @@ OVERRIDE_MENU = "Override the guess"
 OVERRIDE_HINT = f"Changed your mind? Open the menu on my guess, then Apps, then **{OVERRIDE_MENU}**."
 NO_CORRECTIONS = "I've stopped taking notes on this one. I was probably right anyway."
 BAD_NAME = "That's not a name, that's a cry for help. Up to 32 letters, numbers, spaces and dashes, starting with a letter or number."
-DROP_DONE = "done"  # DMing this ends a photo drop
+DROP_DONE = "done"  # DMing this ends a photo drop too. /photos done is the way members are told about.
 
 
 def describe_wait(length: datetime.timedelta) -> str:
@@ -74,6 +75,17 @@ def describe_wait(length: datetime.timedelta) -> str:
             count = seconds // size
             return f"{count} {unit}{'' if count == 1 else 's'}"
     return f"{seconds} second{'' if seconds == 1 else 's'}"
+
+
+def in_a_server():
+    """/photos drop needs a server to know which models and cats are on offer. /photos done works in DMs too."""
+
+    async def predicate(interaction: discord.Interaction) -> bool:
+        if interaction.guild_id is None:
+            raise CheckMessage("Start the drop in the server, so I know whose cats we're talking about. Then bring the photos back here.")
+        return True
+
+    return app_commands.check(predicate)
 
 
 def plural(count: int, word: str) -> str:
@@ -175,7 +187,8 @@ class CorrectionPicker(discord.ui.View):
 
 
 class ClassifierCog(BeansCog):
-    photos = app_commands.Group(name="photos", description="Hand me photos to learn from, by DM.", guild_only=True)
+    # Not guild_only: the photos go in a DM, so /photos done has to work there too.
+    photos = app_commands.Group(name="photos", description="Hand me photos to learn from, by DM.")
 
     def __init__(self, bot):
         super().__init__(bot)
@@ -551,6 +564,7 @@ class ClassifierCog(BeansCog):
     @photos.command(name="drop", description="DM me a pile of photos of one cat, and I'll learn from them.")
     @app_commands.describe(name="Who's in the photos", model="Which of my models they're for (only needed if there's more than one)")
     @requires_feature("classifier")
+    @in_a_server()
     async def drop(self, interaction: discord.Interaction, name: app_commands.Range[str, 1, 32], model: str | None = None):
         assert interaction.guild_id is not None
         model_name, model_config, config = self.pick_drop_model(interaction.guild_id, model)
@@ -578,14 +592,22 @@ class ClassifierCog(BeansCog):
         values = {"label": drop.label, "idle": idle}
         if started.new_label:
             text = scripts.pick(config.new_label_scripts, **values)
-            text = text or f"A cat called {drop.label}? Never met them. DM me every photo you have. I stop listening after {idle} of silence. Say \"done\" when you're finished."
+            text = text or f"A cat called {drop.label}? Never met them. DM me every photo you have. I stop listening after {idle} of silence. Use `/photos done` when you're finished."
         else:
             text = scripts.pick(config.start_scripts, **values)
-            text = text or f"DM me every photo of {drop.label} you have. I stop listening after {idle} of silence. Say \"done\" when you're finished."
+            text = text or f"DM me every photo of {drop.label} you have. I stop listening after {idle} of silence. Use `/photos done` when you're finished."
         text += f"\n-# Up to {config.daily_limit} photos a day."
+        # The opening line goes in a DM, so the member has a conversation to put the photos in.
+        await interaction.response.defer(ephemeral=True)
+        try:
+            opener = await interaction.user.send(text)
+            reply = f"I've slid into your DMs. Put the photos of {drop.label} there: {opener.jump_url}"
+        except discord.HTTPException:
+            self.logger.warning(f"Could not DM user {interaction.user.id} to open their photo drop")
+            reply = f"{text}\n-# I tried to DM you first and got the door slammed in my face. Message me yourself and send them there."
         if started.ended is not None:
-            text = f"{self.drop_summary(started.ended)}\n\n{text}"
-        await interaction.response.send_message(text, ephemeral=True)
+            reply = f"{self.drop_summary(started.ended)}\n\n{reply}"
+        await interaction.followup.send(reply, ephemeral=True)
 
     @drop.autocomplete("model")
     async def drop_model_autocomplete(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
@@ -602,7 +624,6 @@ class ClassifierCog(BeansCog):
         return [app_commands.Choice(name=label, value=label) for label in labels if current.lower() in label.lower()][:25]
 
     @photos.command(name="done", description="Stop sending me photos, and hear how it went.")
-    @requires_feature("classifier")
     async def done(self, interaction: discord.Interaction):
         service = self.services.classifier
         drop = await service.open_drop(interaction.user.id)

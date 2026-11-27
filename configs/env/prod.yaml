@@ -246,12 +246,12 @@ guilds:
             daily_limit: 200  # Photos one member can add to this dataset per 24 hours
             allow_new_labels: true
             start_scripts:  # {label}, {idle}
-            - "Slide into my DMs with every photo of {label} you've got. I'll stop listening after {idle} of silence, so no dawdling. Say \"done\" when you're finished."
-            - "Photo dump of {label}? My DMs are open. Go quiet for {idle} and I'll assume you've run dry. Say \"done\" when you're finished."
-            - "Fine, show me {label}. All of them. You have {idle} between photos before I lose interest. Say \"done\" when you're finished."
+            - "Slide into my DMs with every photo of {label} you've got. I'll stop listening after {idle} of silence, so no dawdling. Use `/photos done` when you're finished."
+            - "Photo dump of {label}? My DMs are open. Go quiet for {idle} and I'll assume you've run dry. Use `/photos done` when you're finished."
+            - "Fine, show me {label}. All of them. You have {idle} between photos before I lose interest. Use `/photos done` when you're finished."
             new_label_scripts:  # {label}, {idle}. The name is one the model doesn't know yet.
-            - "{label}? Never heard of them. DM me the evidence. I stop listening after {idle} of silence. Say \"done\" when you're finished."
-            - "A new cat called {label}. Bold claim. Prove it in my DMs, and don't go quiet for more than {idle}. Say \"done\" when you're finished."
+            - "{label}? Never heard of them. DM me the evidence. I stop listening after {idle} of silence. Use `/photos done` when you're finished."
+            - "A new cat called {label}. Bold claim. Prove it in my DMs, and don't go quiet for more than {idle}. Use `/photos done` when you're finished."
             summary_scripts:  # {label}, {kept}, {duplicates}, {failed}
             - "Drop over. {kept} new photos of {label} in the files, {duplicates} I'd already seen, {failed} I couldn't make out."
             - "That's all for {label}: {kept} kept, {duplicates} repeats (I have a memory, you know), {failed} that were just noise."

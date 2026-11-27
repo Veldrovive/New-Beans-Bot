@@ -12,7 +12,7 @@ The image classifier's photos, corrections and retraining records.
   offered to everyone from then on.
 - A member can hand the bot a pile of photos of one cat by DM: a drop session, started with /photos drop.
   Each photo joins the dataset under the session's label. A member can add only so many a day, and the
-  session ends when they say done or go quiet.
+  session ends when they run /photos done or go quiet.
 - Retraining needs torch, so the classifier cog does it and registers itself here as `retrainer`. That's
   how /admin retrain and the website reach it. Each retrain is recorded with its scores on the val photos.
 - Models with auto retrain on are retrained by the cog once `retrain_due` says enough photos changed, the
