@@ -20,6 +20,7 @@ register_heif_opener()  # Phones send HEIC
 
 MAX_SIDE = 2048
 JPEG_QUALITY = 90
+MAX_UPLOAD = 50 * 1024 * 1024  # Bigger photos are refused, from the website and from DMs
 
 
 def content_hash(data: bytes) -> str:

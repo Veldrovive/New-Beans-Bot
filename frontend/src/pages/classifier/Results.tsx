@@ -169,7 +169,7 @@ export function RunHistory({ dataset }: { dataset: Dataset }) {
             empty="No retrains yet."
             columns={[
               { key: 'when', header: 'Started', render: (r) => <Time value={r.started_at} /> },
-              { key: 'who', header: 'Started by', render: (r) => r.triggered_by },
+              { key: 'who', header: 'Started by', render: (r) => (r.triggered_by === 'auto' ? <Badge>auto retrain</Badge> : r.triggered_by) },
               { key: 'status', header: 'Status', render: (r) => <Badge color={r.status === 'succeeded' ? 'green' : r.status === 'failed' ? 'red' : 'amber'}>{r.status}</Badge> },
               { key: 'train', header: 'Train', render: (r) => r.train_count ?? '', className: 'text-right' },
               { key: 'val', header: 'Val', render: (r) => r.val_count ?? '', className: 'text-right' },

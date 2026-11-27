@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from beans_bot.db.models import ClassifierImage, ClassifierImageSource, ClassifierSplit, ClassifierTrainingRun
 from beans_bot.services.classifier import InvalidLabel, NotAnImage, RetrainFailed, RetrainInProgress
+from beans_bot.services.photos import MAX_UPLOAD
 from beans_bot.web.actions import logger
 from beans_bot.web.context import WebContext
 from beans_bot.web.deps import Actor, Ctx, Guild, Paged
@@ -29,7 +30,6 @@ from beans_bot.web.schemas import Page, Snowflake
 guild_router = APIRouter(prefix="/api/guilds/{guild_id}/classifier", tags=["classifier"])
 router = APIRouter(prefix="/api/classifier", tags=["classifier"])
 
-MAX_UPLOAD = 50 * 1024 * 1024
 IMMUTABLE = {"Cache-Control": "public, max-age=31536000, immutable"}
 
 
@@ -225,7 +225,7 @@ async def images(
     ctx: Ctx,
     label: str | None = None,
     split: Literal["train", "val"] | None = None,
-    source: Literal["seed", "correction", "upload"] | None = None,
+    source: Literal["seed", "correction", "upload", "drop"] | None = None,
     removed: bool | None = False,
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),

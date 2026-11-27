@@ -2990,7 +2990,7 @@ export interface operations {
             query?: {
                 label?: string | null;
                 split?: ("train" | "val") | null;
-                source?: ("seed" | "correction" | "upload") | null;
+                source?: ("seed" | "correction" | "upload" | "drop") | null;
                 removed?: boolean | null;
                 limit?: number;
                 offset?: number;

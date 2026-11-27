@@ -54,6 +54,27 @@ async def test_commands_register(tmp_path: Path):
         await bot.services.db.close()
 
 
+async def test_classifier_commands_register(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """The classifier cog needs torch and loads DINOv3 in cog_load, so this skips the loading and checks the commands."""
+    cog_module = pytest.importorskip("beans_bot.cogs.classifier.cog")
+
+    async def no_models(self) -> None: ...
+
+    monkeypatch.setattr(cog_module.ClassifierCog, "cog_load", no_models)
+    bot = BeansBot(BotConfig(bot_token="x", db_path=tmp_path / "beans.db"))
+    try:
+        await bot.add_cog(cog_module.ClassifierCog(bot))
+        names = {c.qualified_name for c in bot.tree.walk_commands()}
+        assert {"photos drop", "photos done"} <= names
+        photos = bot.tree.get_command("photos")
+        assert photos is not None and photos.guild_only
+        photos.to_dict(bot.tree)
+    finally:
+        for name in list(bot.cogs):
+            await bot.remove_cog(name)
+        await bot.services.db.close()
+
+
 async def test_bot_channel_check_lets_quiet_commands_through():
     config = BotConfig(bot_token="x", guilds={1: GuildConfig(name="test", bot_channel_id=10)})
 

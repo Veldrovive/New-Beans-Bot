@@ -10,17 +10,24 @@ The image classifier's photos, corrections and retraining records.
   way its photos join the dataset under that label. Correcting a post again moves them to the new label.
 - A member can also name a cat the model has never heard of. That starts a new label, and the name is
   offered to everyone from then on.
+- A member can hand the bot a pile of photos of one cat by DM: a drop session, started with /photos drop.
+  Each photo joins the dataset under the session's label. A member can add only so many a day, and the
+  session ends when they say done or go quiet.
 - Retraining needs torch, so the classifier cog does it and registers itself here as `retrainer`. That's
   how /admin retrain and the website reach it. Each retrain is recorded with its scores on the val photos.
+- Models with auto retrain on are retrained by the cog once `retrain_due` says enough photos changed, the
+  changes have stopped, no drop is open and the last run was a while ago.
 """
 
 from __future__ import annotations
 
 import asyncio
+import datetime
 import logging
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +38,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from beans_bot.db.engine import Database
 from beans_bot.db.models import (
     ClassifierCorrection,
+    ClassifierDropSession,
     ClassifierImage,
     ClassifierImageSource,
     ClassifierProcessedMessage,
@@ -45,6 +53,8 @@ logger = logging.getLogger(__name__)
 # Labels and dataset names become folder and file names, so they're kept this plain.
 NEW_LABEL = re.compile(r"[a-z0-9][a-z0-9_-]{0,31}")
 DATASET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}")
+# A drop's daily limit counts the photos a member added in this window.
+DROP_LIMIT_WINDOW = datetime.timedelta(hours=24)
 
 
 class NotClassified(Exception):
@@ -90,6 +100,35 @@ class RetrainInProgress(Exception):
 
 class RetrainFailed(Exception):
     """A retrain that couldn't run. The message is for the admin who asked."""
+
+
+class DropLimitReached(Exception):
+    """The member already added their daily limit of photos to this dataset."""
+
+    def __init__(self, limit: int):
+        super().__init__(limit)
+        self.limit = limit
+
+
+class DropOutcome(StrEnum):
+    KEPT = "kept"
+    DUPLICATE = "duplicate"  # Already in the dataset
+    FAILED = "failed"  # Couldn't be read
+    OVER_LIMIT = "over_limit"  # The member's daily limit is used up. Nothing was stored.
+    CLOSED = "closed"  # The session ended or went quiet too long. Nothing changed.
+
+
+@dataclass
+class DropResult:
+    outcome: DropOutcome
+    session: ClassifierDropSession | None  # As it is after this photo. None if there's no such session.
+
+
+@dataclass
+class DropStart:
+    session: ClassifierDropSession
+    ended: ClassifierDropSession | None  # The member's previous drop, ended to make way for this one
+    new_label: bool  # Nobody had used this label before
 
 
 @dataclass
@@ -505,6 +544,169 @@ class ClassifierService:
             )
             return {(row.guild_id, row.message_id): row.channel_id for row in result.all()}
 
+    # --- Photo drops by DM -----------------------------------------------------------------
+
+    async def _drops_used(self, session: AsyncSession, user_id: int, dataset: str, now: datetime.datetime) -> int:
+        """Photos the member dropped into this dataset in the last 24 hours."""
+        result = await session.exec(
+            select(func.count())
+            .select_from(ClassifierImage)
+            .where(
+                ClassifierImage.dataset == dataset,
+                ClassifierImage.source == ClassifierImageSource.DROP,
+                ClassifierImage.added_by == user_id,
+                col(ClassifierImage.added_at) > now - DROP_LIMIT_WINDOW,
+            )
+        )
+        return result.one()
+
+    async def _end_open_drops(self, session: AsyncSession, user_id: int, now: datetime.datetime) -> list[ClassifierDropSession]:
+        result = await session.exec(
+            select(ClassifierDropSession)
+            .where(ClassifierDropSession.user_id == user_id, col(ClassifierDropSession.ended_at).is_(None))
+            .order_by(col(ClassifierDropSession.id).desc())
+        )
+        ended = list(result.all())
+        for row in ended:
+            row.ended_at = now
+            session.add(row)
+        return ended
+
+    async def start_drop(
+        self,
+        guild_id: int,
+        user_id: int,
+        classifier_name: str,
+        dataset: str,
+        label: str,
+        *,
+        model_labels: list[str],
+        allow_new: bool,
+        idle_timeout: datetime.timedelta,
+        daily_limit: int,
+        now: datetime.datetime | None = None,
+    ) -> DropStart:
+        """
+        Opens a drop session for the member, ending any they already had open. `label` is what the member
+        typed. Raises InvalidLabel, UnknownLabel (a new name when `allow_new` is off) or DropLimitReached.
+        """
+        self.check_dataset(dataset)
+        now = now or utcnow()
+        known = await self.known_labels(dataset, model_labels)
+        if label not in known:
+            label = normalize_label(label)
+        new_label = label not in known
+        if new_label and not allow_new:
+            raise UnknownLabel(label)
+        async with self.db.transaction() as session:
+            if await self._drops_used(session, user_id, dataset, now) >= daily_limit:
+                raise DropLimitReached(daily_limit)
+            ended = await self._end_open_drops(session, user_id, now)
+            drop = ClassifierDropSession(
+                guild_id=guild_id,
+                user_id=user_id,
+                classifier_name=classifier_name,
+                dataset=dataset,
+                label=label,
+                idle_timeout=int(idle_timeout.total_seconds()),
+                started_at=now,
+                last_photo_at=now,
+            )
+            session.add(drop)
+        logger.info(f"Guild {guild_id}: user {user_id} started a {classifier_name} photo drop of {label} (session {drop.id})")
+        return DropStart(session=drop, ended=ended[0] if ended else None, new_label=new_label)
+
+    async def open_drop(self, user_id: int, now: datetime.datetime | None = None) -> ClassifierDropSession | None:
+        """The member's open drop session. One past its idle timeout counts as closed, even before the timer ends it."""
+        now = now or utcnow()
+        async with self.db.transaction() as session:
+            result = await session.exec(
+                select(ClassifierDropSession)
+                .where(ClassifierDropSession.user_id == user_id, col(ClassifierDropSession.ended_at).is_(None))
+                .order_by(col(ClassifierDropSession.id).desc())
+            )
+            return next((row for row in result.all() if row.is_open(now)), None)
+
+    async def drop_photo(
+        self, session_id: int, data: bytes, original_name: str | None, *, daily_limit: int, now: datetime.datetime | None = None
+    ) -> DropResult:
+        """Stores one photo from a drop under the session's label, and counts it."""
+        try:
+            # Shrinking big photos is slow, so it happens before the transaction (and its write lock) starts.
+            photo: Photo | None = await asyncio.to_thread(prepare_photo, data, original_name)
+        except NotAnImage:
+            photo = None
+        now = now or utcnow()
+        async with self.db.transaction() as session:
+            drop = await session.get(ClassifierDropSession, session_id)
+            if drop is None or not drop.is_open(now):
+                return DropResult(DropOutcome.CLOSED, drop)
+            if photo is None:
+                outcome = DropOutcome.FAILED
+                drop.failed += 1
+            elif (existing := await self._by_hash(session, drop.dataset, photo.content_hash)) is not None and existing.removed_at is None:
+                outcome = DropOutcome.DUPLICATE  # Duplicates don't use up the daily limit
+                drop.duplicates += 1
+            elif await self._drops_used(session, drop.user_id, drop.dataset, now) >= daily_limit:
+                return DropResult(DropOutcome.OVER_LIMIT, drop)
+            else:
+                await self._add(
+                    session,
+                    drop.dataset,
+                    photo,
+                    label=drop.label,
+                    source=ClassifierImageSource.DROP,
+                    split=None,
+                    guild_id=drop.guild_id,
+                    added_by=drop.user_id,
+                )
+                outcome = DropOutcome.KEPT
+                drop.kept += 1
+            drop.last_photo_at = now
+            session.add(drop)
+        if outcome == DropOutcome.KEPT:
+            logger.info(f"Guild {drop.guild_id}: user {drop.user_id} dropped a photo of {drop.label} into {drop.dataset} (session {session_id})")
+        return DropResult(outcome, drop)
+
+    async def drop_unreadable(self, session_id: int, now: datetime.datetime | None = None) -> DropResult:
+        """Counts an attachment the bot couldn't download, or that was too big, as failed."""
+        now = now or utcnow()
+        async with self.db.transaction() as session:
+            drop = await session.get(ClassifierDropSession, session_id)
+            if drop is None or not drop.is_open(now):
+                return DropResult(DropOutcome.CLOSED, drop)
+            drop.failed += 1
+            drop.last_photo_at = now
+            session.add(drop)
+        return DropResult(DropOutcome.FAILED, drop)
+
+    async def end_drop(self, session_id: int, now: datetime.datetime | None = None) -> ClassifierDropSession | None:
+        """Ends a drop session. Returns it, or None if it had already ended, so only one caller sends the summary."""
+        async with self.db.transaction() as session:
+            drop = await session.get(ClassifierDropSession, session_id)
+            if drop is None or drop.ended_at is not None:
+                return None
+            drop.ended_at = now or utcnow()
+            session.add(drop)
+        logger.info(f"Guild {drop.guild_id}: user {drop.user_id}'s photo drop {session_id} ended with {drop.kept} kept")
+        return drop
+
+    async def expired_drops(self, now: datetime.datetime | None = None) -> list[ClassifierDropSession]:
+        """Sessions that haven't ended but went quiet past their idle timeout, for the timer to close."""
+        now = now or utcnow()
+        async with self.db.transaction() as session:
+            result = await session.exec(select(ClassifierDropSession).where(col(ClassifierDropSession.ended_at).is_(None)))
+            return [row for row in result.all() if not row.is_open(now)]
+
+    async def open_drops(self, dataset: str, now: datetime.datetime | None = None) -> int:
+        """How many drop sessions are open for this dataset."""
+        now = now or utcnow()
+        async with self.db.transaction() as session:
+            result = await session.exec(
+                select(ClassifierDropSession).where(ClassifierDropSession.dataset == dataset, col(ClassifierDropSession.ended_at).is_(None))
+            )
+            return sum(1 for row in result.all() if row.is_open(now))
+
     # --- Training runs ------------------------------------------------------------------------
 
     async def start_run(self, dataset: str, triggered_by: str) -> ClassifierTrainingRun:
@@ -584,3 +786,44 @@ class ClassifierService:
                 .where(ClassifierImage.dataset == dataset, or_(col(ClassifierImage.updated_at) > when, col(ClassifierImage.added_at) > when))
             )
             return result.one()
+
+    async def retrain_due(
+        self,
+        dataset: str,
+        *,
+        min_changes: int,
+        quiet_period: datetime.timedelta,
+        min_interval: datetime.timedelta,
+        now: datetime.datetime | None = None,
+    ) -> bool:
+        """
+        Whether auto retrain should retrain this dataset now: enough photos changed since the newest run of
+        any status started (so a failed run isn't retried until more change), the changes have stopped for
+        `quiet_period`, no drop is open, the newest run started `min_interval` ago, and nothing is retraining.
+        """
+        now = now or utcnow()
+        if await self.running_run() is not None:
+            return False
+        async with self.db.transaction() as session:
+            newest = (
+                await session.exec(
+                    select(ClassifierTrainingRun).where(ClassifierTrainingRun.dataset == dataset).order_by(col(ClassifierTrainingRun.id).desc()).limit(1)
+                )
+            ).first()
+            total, last_added, last_updated = (
+                await session.exec(
+                    select(func.count(), func.max(col(ClassifierImage.added_at)), func.max(col(ClassifierImage.updated_at))).where(
+                        ClassifierImage.dataset == dataset
+                    )
+                )
+            ).one()
+        if newest is not None and now - newest.started_at < min_interval:
+            return False
+        # With no run yet, every photo counts.
+        changed = total if newest is None else await self.changed_since(dataset, newest.started_at)
+        if changed < min_changes:
+            return False
+        newest_change = max((t for t in (last_added, last_updated) if t is not None), default=None)
+        if newest_change is not None and now - newest_change < quiet_period:
+            return False
+        return await self.open_drops(dataset, now) == 0

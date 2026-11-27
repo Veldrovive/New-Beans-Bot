@@ -210,6 +210,27 @@ class ClassifierCorrectionsConfig(StrictModel):
     new_label_scripts: list[str] = []  # {corrector}, {old_label}, {new_label}. A label the model doesn't know yet.
 
 
+class ClassifierDropConfig(StrictModel):
+    """Lets a member DM the bot a pile of photos of one cat after /photos drop."""
+
+    idle_timeout: datetime.timedelta = datetime.timedelta(minutes=15)  # The session ends after this long with no photos
+    daily_limit: int = 200  # Photos one member can add to this dataset per 24 hours
+    allow_new_labels: bool = True
+    start_scripts: list[str] = []  # {label}, {idle}
+    new_label_scripts: list[str] = []  # {label}, {idle}. The name is one the model doesn't know yet.
+    summary_scripts: list[str] = []  # {label}, {kept}, {duplicates}, {failed}
+    no_session_scripts: list[str] = []  # Someone DMed photos without starting a drop
+    limit_scripts: list[str] = []  # {limit}. The daily limit is used up.
+
+
+class ClassifierAutoRetrainConfig(StrictModel):
+    """Retrains the model by itself once enough photos have changed and things have gone quiet."""
+
+    min_changes: int = 10  # Photos added, changed or removed since the newest run started
+    quiet_period: datetime.timedelta = datetime.timedelta(minutes=10)  # Since the newest change
+    min_interval: datetime.timedelta = datetime.timedelta(hours=1)  # Since the newest run started
+
+
 class ClassifierModelConfig(StrictModel):
     model_path: str  # Relative to classifier.models_dir
     auto_respond_channels: list[int] = []
@@ -218,6 +239,8 @@ class ClassifierModelConfig(StrictModel):
     select_random_prob: float = 0.0  # Otherwise pick the least recently used script
     scripts: list[ClassifierScript]
     corrections: ClassifierCorrectionsConfig | None = None  # Missing means guesses can't be corrected
+    drop: ClassifierDropConfig | None = None  # Missing means members can't DM photos for this model
+    auto_retrain: ClassifierAutoRetrainConfig | None = None  # Missing means only admins retrain it
 
 
 class ClassifierGuildConfig(StrictModel):

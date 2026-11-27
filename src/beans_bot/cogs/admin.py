@@ -10,7 +10,7 @@ Admin tools, for server admins. Every reply here is ephemeral, so nobody sees wh
   other side, so coins never appear from nowhere or vanish. The member isn't told.
 - /admin retrain retrains each of the server's classifier models that takes corrections, on its dataset's
   train photos, and reports how each scored on its val photos. It runs in the background. The website
-  can retrain one dataset at a time too.
+  can retrain one dataset at a time too, and models with auto retrain on retrain themselves.
 """
 
 from __future__ import annotations

@@ -241,6 +241,31 @@ guilds:
             - "Holy guacamole! {new_label} has hit the market."
             - "The cat distribution system has endowed us with {new_label}."
             - "{new_label} before GTA 6?!?!"
+          drop:
+            idle_timeout: PT15M  # The session ends after this long with no photos
+            daily_limit: 200  # Photos one member can add to this dataset per 24 hours
+            allow_new_labels: true
+            start_scripts:  # {label}, {idle}
+            - "Slide into my DMs with every photo of {label} you've got. I'll stop listening after {idle} of silence, so no dawdling. Say \"done\" when you're finished."
+            - "Photo dump of {label}? My DMs are open. Go quiet for {idle} and I'll assume you've run dry. Say \"done\" when you're finished."
+            - "Fine, show me {label}. All of them. You have {idle} between photos before I lose interest. Say \"done\" when you're finished."
+            new_label_scripts:  # {label}, {idle}. The name is one the model doesn't know yet.
+            - "{label}? Never heard of them. DM me the evidence. I stop listening after {idle} of silence. Say \"done\" when you're finished."
+            - "A new cat called {label}. Bold claim. Prove it in my DMs, and don't go quiet for more than {idle}. Say \"done\" when you're finished."
+            summary_scripts:  # {label}, {kept}, {duplicates}, {failed}
+            - "Drop over. {kept} new photos of {label} in the files, {duplicates} I'd already seen, {failed} I couldn't make out."
+            - "That's all for {label}: {kept} kept, {duplicates} repeats (I have a memory, you know), {failed} that were just noise."
+            - "Session closed. {label} gained {kept} photos. {duplicates} were reruns and {failed} were unreadable."
+            no_session_scripts:  # Someone DMed photos without starting a drop
+            - "Cute, but who is it? Run /photos drop in the server first and tell me."
+            - "I don't take anonymous photos. Run /photos drop in the server so I know who I'm looking at."
+            limit_scripts:  # {limit}. The daily limit is used up.
+            - "That's {limit} photos today. My eyes need a rest. Come back tomorrow."
+            - "{limit} photos in a day is my limit. I'm a bot, not a photo album. Try again tomorrow."
+          auto_retrain:
+            min_changes: 10
+            quiet_period: PT10M
+            min_interval: PT1H
         emotions:
           model_path: emotions
           auto_respond_channels:

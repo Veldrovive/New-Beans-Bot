@@ -59,6 +59,7 @@ class ClassifierImageSource(StrEnum):
     SEED = "seed"  # The original dataset from Aidan's Mac, brought in by scripts/import_classifier_dataset.py
     CORRECTION = "correction"  # A member confirmed or corrected the bot's guess in Discord
     UPLOAD = "upload"  # Added on the admin website
+    DROP = "drop"  # A member handed the bot photos by DM
 
 
 class ClassifierImage(SQLModel, table=True):
@@ -77,7 +78,7 @@ class ClassifierImage(SQLModel, table=True):
     source: str  # A ClassifierImageSource
     guild_id: int | None = None  # Set for corrections
     message_id: int | None = Field(default=None, index=True)
-    added_by: int | None = None  # The member who confirmed or corrected it
+    added_by: int | None = None  # The member who confirmed, corrected or dropped it
     added_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
     updated_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
     removed_at: datetime.datetime | None = Field(default=None, sa_type=UTCDateTime)  # Soft delete: not trained on, can be restored
@@ -101,3 +102,33 @@ class ClassifierTrainingRun(SQLModel, table=True):
     log_loss: float | None = None
     # labels, per_label, confusion, predictions, skipped, unseen_val_labels. See training.RunResults.
     results: dict | None = Field(default=None, sa_column=Column(JSON))
+
+
+class ClassifierDropSession(SQLModel, table=True):
+    """
+    A member handing the bot photos of one cat by DM, from /photos drop until they say done or go quiet.
+    Ending sets ended_at. Rows are never deleted.
+    """
+
+    __tablename__ = "classifier_drop_session"
+
+    id: int | None = Field(default=None, primary_key=True)
+    guild_id: int  # Where /photos drop was run
+    user_id: int = Field(index=True)
+    classifier_name: str
+    dataset: str  # The model's model_path
+    label: str
+    idle_timeout: int  # Seconds without photos before it ends, from the model's config when it started
+    started_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
+    last_photo_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)  # Starts as started_at
+    ended_at: datetime.datetime | None = Field(default=None, sa_type=UTCDateTime)  # None while open
+    kept: int = 0
+    duplicates: int = 0  # Already in the dataset
+    failed: int = 0  # Couldn't be read
+
+    def expires_at(self) -> datetime.datetime:
+        return self.last_photo_at + datetime.timedelta(seconds=self.idle_timeout)
+
+    def is_open(self, now: datetime.datetime) -> bool:
+        """Not ended, and not past its idle timeout. An expired session the timer hasn't closed yet counts as closed."""
+        return self.ended_at is None and now < self.expires_at()

@@ -12,7 +12,7 @@ import { LabelInput } from './LabelInput'
 import { QuickActions } from './QuickActions'
 
 const REMOVED = '\u0000removed'
-const SOURCE_COLOR = { seed: 'stone', correction: 'blue', upload: 'purple' } as const
+const SOURCE_COLOR = { seed: 'stone', correction: 'blue', upload: 'purple', drop: 'amber' } as const
 
 /** A photo opened large, with its details and the quick actions. */
 export function Lightbox({ image, labels, onClose }: { image: ImageRow | null; labels: string[]; onClose: () => void }) {
@@ -220,6 +220,7 @@ export function Photos({ dataset }: { dataset: Dataset }) {
               <option value="seed">seed</option>
               <option value="correction">corrections</option>
               <option value="upload">uploads</option>
+              <option value="drop">DM drops</option>
             </select>
             {rows.length > 0 && (
               <Button variant="ghost" onClick={() => setSelected(selected.size === rows.length ? new Set() : new Set(rows.map((r) => r.id)))}>

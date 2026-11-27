@@ -2064,7 +2064,8 @@
                   "enum": [
                     "seed",
                     "correction",
-                    "upload"
+                    "upload",
+                    "drop"
                   ],
                   "type": "string"
                 },

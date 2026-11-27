@@ -1,6 +1,7 @@
 """The classifier's dataset on the website: photos, labels, splits, uploads and retraining."""
 
 import asyncio
+import datetime
 import io
 
 from PIL import Image
@@ -91,6 +92,18 @@ async def test_corrections_link_to_their_message(web_client, web_services):
     await web_services.classifier.confirm(GUILD, 500, "cats", "cats", 3, [("a.png", png((5, 5, 5)))])
     (image,) = (await web_client.get("/api/classifier/datasets/cats/images")).json()["items"]
     assert (image["source"], image["guild_id"], image["channel_id"], image["message_id"], image["added_by"]) == ("correction", str(GUILD), "77", "500", "3")
+
+
+async def test_dropped_photos_can_be_filtered_by_source(web_client, web_services):
+    service = web_services.classifier
+    started = await service.start_drop(
+        GUILD, 3, "cats", "cats", "bean", model_labels=["bean"], allow_new=True, idle_timeout=datetime.timedelta(minutes=15), daily_limit=10
+    )
+    assert started.session.id is not None
+    await service.drop_photo(started.session.id, png((6, 6, 6)), "dm.png", daily_limit=10)
+    await upload(web_client, png((7, 7, 7)))
+    (image,) = (await web_client.get("/api/classifier/datasets/cats/images", params={"source": "drop"})).json()["items"]
+    assert (image["source"], image["label"], image["guild_id"], image["message_id"], image["added_by"]) == ("drop", "bean", str(GUILD), None, "3")
 
 
 async def test_retrain_needs_the_cog(web_client):

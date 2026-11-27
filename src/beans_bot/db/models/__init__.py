@@ -3,6 +3,7 @@
 from beans_bot.db.models.auto_bets import AutoBetPost
 from beans_bot.db.models.classifier import (
     ClassifierCorrection,
+    ClassifierDropSession,
     ClassifierImage,
     ClassifierImageSource,
     ClassifierProcessedMessage,
@@ -26,6 +27,7 @@ __all__ = [
     "AutoBetPost",
     "BirthdayMessage",
     "ClassifierCorrection",
+    "ClassifierDropSession",
     "ClassifierImage",
     "ClassifierImageSource",
     "ClassifierProcessedMessage",
