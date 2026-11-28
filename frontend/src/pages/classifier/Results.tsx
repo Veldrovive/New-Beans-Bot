@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { DataTable } from '../../components/DataTable'
 import { Badge, Card, Empty, fieldClass, Loaded, Stat } from '../../components/ui'
 import { Time } from '../../components/Time'
-import { percent, thumbUrl, useRun, useRuns, type Dataset, type Prediction, type Results as RunResults } from './api'
+import { largeUrl, percent, thumbUrl, useRun, useRuns, type Dataset, type Prediction, type Results as RunResults } from './api'
 import { QuickActions } from './QuickActions'
 
 function Confusion({ results, cell, onCell }: { results: RunResults; cell: [number, number] | null; onCell: (cell: [number, number] | null) => void }) {
@@ -53,6 +53,63 @@ function PredictionTile({ prediction, labels }: { prediction: Prediction; labels
         </div>
         <div className="text-xs text-stone-500">{top.map(([label, p]) => `${label} ${percent(p)}`).join(' · ')}</div>
         <QuickActions ids={[prediction.image_id]} labels={labels} compact />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * How one label's photos were grouped for cross validation. Each group is a k-means cluster that was held
+ * out together, so the photos in a group should look alike. Read from the run's predictions, where a
+ * label's photos in one fold are one cluster.
+ */
+function Clusters({ results }: { results: RunResults }) {
+  const scored = results.labels.filter((l) => results.per_label[l].val > 0)
+  const [chosen, setChosen] = useState<string | undefined>()
+  const label = chosen !== undefined && scored.includes(chosen) ? chosen : scored[0]
+  if (label === undefined) return null
+  const byFold = new Map<number, Prediction[]>()
+  for (const p of results.predictions) {
+    if (p.label !== label || p.fold === undefined) continue
+    byFold.set(p.fold, [...(byFold.get(p.fold) ?? []), p])
+  }
+  const clusters = [...byFold.entries()].sort(([, a], [, b]) => b.length - a.length)
+  return (
+    <div>
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h3 className="font-semibold">Clusters held out together</h3>
+        <select className={fieldClass} value={label} onChange={(e) => setChosen(e.target.value)}>
+          {scored.map((l) => (
+            <option key={l} value={l}>
+              {l} ({results.per_label[l].val})
+            </option>
+          ))}
+        </select>
+        <span className="text-xs text-stone-500">
+          Each row was guessed by a model that saw none of it, so a row should hold look-alikes. A red ring is a wrong guess.
+          {clusters.every(([, photos]) => photos.length === 1) && ' This label has too few photos to cluster: one photo per fold.'}
+        </span>
+      </div>
+      <div className="space-y-2">
+        {clusters.map(([fold, photos]) => {
+          const right = photos.filter((p) => p.correct).length
+          return (
+            <div key={fold} className="flex gap-3 rounded-lg border border-stone-200 p-2">
+              <div className="w-24 shrink-0 text-xs text-stone-500">
+                <div className="text-sm font-medium text-stone-800">Fold {fold + 1}</div>
+                {photos.length} photo{photos.length === 1 ? '' : 's'}
+                <div className={right === photos.length ? 'text-green-700' : 'text-red-700'}>{right} right</div>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {photos.map((p) => (
+                  <a key={p.image_id} href={largeUrl(p.image_id)} target="_blank" rel="noreferrer" title={p.correct ? `Guessed ${p.predicted}` : `Wrongly guessed ${p.predicted}`}>
+                    <img src={thumbUrl(p.image_id)} loading="lazy" alt={label} className={`h-20 w-20 rounded object-cover ${p.correct ? '' : 'ring-2 ring-red-500'}`} />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -158,6 +215,7 @@ export function Results({ dataset }: { dataset: Dataset }) {
                     </div>
                   )}
                 </div>
+                {cross && <Clusters key={r.id} results={results} />}
               </div>
             )
           }}
