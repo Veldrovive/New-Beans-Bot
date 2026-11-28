@@ -1976,6 +1976,71 @@
         }
       }
     },
+    "/api/guilds/{guild_id}/classifier/drops": {
+      "get": {
+        "tags": [
+          "classifier"
+        ],
+        "summary": "Drops",
+        "operationId": "drops_api_guilds__guild_id__classifier_drops_get",
+        "parameters": [
+          {
+            "name": "guild_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Guild Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_DropOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/classifier/datasets": {
       "get": {
         "tags": [
@@ -3571,6 +3636,110 @@
         "title": "Done",
         "description": "A plain answer for actions with nothing else to say."
       },
+      "DropOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "user_id": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "User Id"
+          },
+          "classifier_name": {
+            "type": "string",
+            "title": "Classifier Name"
+          },
+          "dataset": {
+            "type": "string",
+            "title": "Dataset"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "open": {
+            "type": "boolean",
+            "title": "Open"
+          },
+          "kept": {
+            "type": "integer",
+            "title": "Kept"
+          },
+          "duplicates": {
+            "type": "integer",
+            "title": "Duplicates"
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed"
+          },
+          "photos": {
+            "items": {
+              "$ref": "#/components/schemas/DropPhoto"
+            },
+            "type": "array",
+            "title": "Photos"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "user_id",
+          "classifier_name",
+          "dataset",
+          "label",
+          "started_at",
+          "ended_at",
+          "open",
+          "kept",
+          "duplicates",
+          "failed",
+          "photos"
+        ],
+        "title": "DropOut"
+      },
+      "DropPhoto": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "removed": {
+            "type": "boolean",
+            "title": "Removed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "removed"
+        ],
+        "title": "DropPhoto"
+      },
       "EaterOut": {
         "properties": {
           "user_id": {
@@ -4815,6 +4984,27 @@
           "total"
         ],
         "title": "Page[BirthdayOut]"
+      },
+      "Page_DropOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DropOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "Page[DropOut]"
       },
       "Page_GuessOut_": {
         "properties": {

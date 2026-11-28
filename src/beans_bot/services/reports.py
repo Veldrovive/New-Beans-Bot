@@ -24,6 +24,9 @@ from beans_bot.db.models import (
     AutoBetPost,
     BirthdayMessage,
     ClassifierCorrection,
+    ClassifierDropSession,
+    ClassifierImage,
+    ClassifierImageSource,
     ClassifierProcessedMessage,
     CoinAccount,
     CoinTransaction,
@@ -132,6 +135,12 @@ class FatCowStats:
 class Guess:
     guess: ClassifierProcessedMessage
     correction: ClassifierCorrection | None  # The newest one
+
+
+@dataclass
+class Drop:
+    session: ClassifierDropSession
+    photos: list[ClassifierImage]  # What the member handed over in it, oldest first. Removed ones included.
 
 
 def snipe_status(snipe: Snipe) -> str:
@@ -451,3 +460,24 @@ class ReportService:
                 for correction in result.all():
                     latest[(correction.message_id, correction.classifier_name)] = correction
         return [Guess(guess=g, correction=latest.get((g.message_id, g.classifier_name))) for g in guesses], total
+
+    async def classifier_drops(self, guild_id: int, limit: int = 20, offset: int = 0) -> tuple[list[Drop], int]:
+        """
+        The photo drops started in this guild, newest first, each with the photos it added. Photos don't
+        record their drop, so they're matched by member, dataset and time. A member has one drop open at a time.
+        """
+        query = select(ClassifierDropSession).where(ClassifierDropSession.guild_id == guild_id)
+        async with self.db.transaction() as session:
+            sessions, total = await self._page(session, query.order_by(col(ClassifierDropSession.id).desc()), limit, offset)
+            drops: list[Drop] = []
+            for drop in sessions:
+                photos = select(ClassifierImage).where(
+                    ClassifierImage.dataset == drop.dataset,
+                    ClassifierImage.source == ClassifierImageSource.DROP,
+                    ClassifierImage.added_by == drop.user_id,
+                    col(ClassifierImage.added_at) >= drop.started_at,
+                )
+                if drop.ended_at is not None:
+                    photos = photos.where(col(ClassifierImage.added_at) <= drop.ended_at)
+                drops.append(Drop(session=drop, photos=list((await session.exec(photos.order_by(col(ClassifierImage.id)))).all())))
+        return drops, total

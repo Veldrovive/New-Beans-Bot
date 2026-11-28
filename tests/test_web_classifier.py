@@ -106,6 +106,36 @@ async def test_dropped_photos_can_be_filtered_by_source(web_client, web_services
     assert (image["source"], image["label"], image["guild_id"], image["message_id"], image["added_by"]) == ("drop", "bean", str(GUILD), None, "3")
 
 
+async def test_drops_list_who_dropped_which_photos(web_client, web_services):
+    service = web_services.classifier
+    timeout = datetime.timedelta(minutes=15)
+    first = await service.start_drop(GUILD, 3, "cats", "cats", "bean", model_labels=["bean"], allow_new=True, idle_timeout=timeout, daily_limit=10)
+    await service.drop_photo(first.session.id or 0, png((1, 2, 3)), "a.png", daily_limit=10)
+    await service.drop_photo(first.session.id or 0, png((1, 2, 3)), "a.png", daily_limit=10)  # A duplicate
+    await service.end_drop(first.session.id or 0)
+    # The same member again, and someone else: each drop gets only its own photos.
+    second = await service.start_drop(GUILD, 3, "cats", "cats", "moo", model_labels=["bean"], allow_new=True, idle_timeout=timeout, daily_limit=10)
+    await service.drop_photo(second.session.id or 0, png((4, 5, 6)), "b.png", daily_limit=10)
+    other = await service.start_drop(GUILD, 4, "cats", "cats", "bean", model_labels=["bean"], allow_new=True, idle_timeout=timeout, daily_limit=10)
+    await service.drop_photo(other.session.id or 0, png((7, 8, 9)), "c.png", daily_limit=10)
+    await upload(web_client, png((9, 9, 9)))  # Not a drop
+
+    page = (await web_client.get(f"/api/guilds/{GUILD}/classifier/drops")).json()
+    assert page["total"] == 3
+    newest, middle, oldest = page["items"]
+    assert (newest["user_id"], newest["label"], newest["open"], [p["label"] for p in newest["photos"]]) == ("4", "bean", True, ["bean"])
+    assert (middle["user_id"], middle["label"], middle["open"], [p["label"] for p in middle["photos"]]) == ("3", "moo", True, ["moo"])
+    assert (oldest["user_id"], oldest["kept"], oldest["duplicates"], oldest["open"]) == ("3", 1, 1, False)
+    assert oldest["ended_at"] is not None and len(oldest["photos"]) == 1
+    ids = {p["id"] for d in page["items"] for p in d["photos"]}
+    assert len(ids) == 3
+
+    # A removed photo still shows, marked.
+    await service.update_images([oldest["photos"][0]["id"]], removed=True)
+    page = (await web_client.get(f"/api/guilds/{GUILD}/classifier/drops")).json()
+    assert page["items"][2]["photos"][0]["removed"] is True
+
+
 async def test_retrain_needs_the_cog(web_client):
     assert (await web_client.post("/api/classifier/datasets/cats/retrain")).status_code == 503
     assert (await web_client.get("/api/classifier/datasets/cats/progress")).json() == {"running": False, "done": 0, "total": 0}

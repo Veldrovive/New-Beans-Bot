@@ -263,7 +263,6 @@ guilds:
             - "That's {limit} photos today. My eyes need a rest. Come back tomorrow."
             - "{limit} photos in a day is my limit. I'm a bot, not a photo album. Try again tomorrow."
           auto_retrain:
-            min_changes: 10
             quiet_period: PT10M
             min_interval: PT1H
         emotions:

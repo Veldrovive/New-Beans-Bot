@@ -224,9 +224,8 @@ class ClassifierDropConfig(StrictModel):
 
 
 class ClassifierAutoRetrainConfig(StrictModel):
-    """Retrains the model by itself once enough photos have changed and things have gone quiet."""
+    """Retrains the model by itself once any photo has changed and things have gone quiet."""
 
-    min_changes: int = 10  # Photos added, changed or removed since the newest run started
     quiet_period: datetime.timedelta = datetime.timedelta(minutes=10)  # Since the newest change
     min_interval: datetime.timedelta = datetime.timedelta(hours=1)  # Since the newest run started
 

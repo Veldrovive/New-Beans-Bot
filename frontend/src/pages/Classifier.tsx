@@ -7,7 +7,7 @@ import { DataTable, Pagination, usePaging } from '../components/DataTable'
 import { DiscordLink, MemberName } from '../components/Names'
 import { Badge, Card, Empty, Loaded, PageHeader } from '../components/ui'
 import { Time } from '../components/Time'
-import { useDatasets } from './classifier/api'
+import { largeUrl, thumbUrl, useDatasets } from './classifier/api'
 import { DatasetHeader } from './classifier/Header'
 import { Photos } from './classifier/Photos'
 import { Results, RunHistory } from './classifier/Results'
@@ -62,6 +62,79 @@ export function RecentGuesses() {
   )
 }
 
+/** The photo drops members made from this server: who handed over which photos, and of which cat. */
+export function RecentDrops() {
+  const paging = usePaging(20)
+  const data = useGuildQuery<Schemas['Page_DropOut_']>(`/classifier/drops${query({ limit: paging.limit, offset: paging.offset })}`)
+  return (
+    <Card title="Recent photo drops in this server">
+      <Loaded query={data}>
+        {(page) => (
+          <>
+            <DataTable
+              rows={page.items}
+              rowKey={(d) => String(d.id)}
+              empty="Nobody has dropped photos from this server yet."
+              columns={[
+                { key: 'when', header: 'When', render: (d) => <Time value={d.started_at} /> },
+                { key: 'who', header: 'Who', render: (d) => <MemberName id={d.user_id} /> },
+                {
+                  key: 'cat',
+                  header: 'Said it was',
+                  render: (d) => (
+                    <span className="flex items-center gap-2">
+                      {d.label}
+                      {d.open && <Badge color="amber">open</Badge>}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'counts',
+                  header: 'Kept',
+                  render: (d) => (
+                    <span title={`${d.duplicates} already in the dataset, ${d.failed} unreadable`}>
+                      {d.kept}
+                      {d.duplicates + d.failed > 0 && <span className="text-stone-400"> (+{d.duplicates + d.failed} not kept)</span>}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'photos',
+                  header: 'Photos',
+                  render: (d) =>
+                    d.photos.length === 0 ? (
+                      <span className="text-stone-400">none</span>
+                    ) : (
+                      <div className="flex max-w-xl flex-wrap gap-1">
+                        {d.photos.map((p) => (
+                          <a
+                            key={p.id}
+                            href={largeUrl(p.id)}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={p.removed ? `${p.label} (removed from the dataset)` : p.label !== d.label ? `Relabelled ${p.label}` : p.label}
+                          >
+                            <img
+                              src={thumbUrl(p.id)}
+                              loading="lazy"
+                              alt={p.label}
+                              className={`h-14 w-14 rounded object-cover ${p.removed ? 'opacity-30 grayscale' : ''} ${p.label !== d.label ? 'ring-2 ring-red-400' : ''}`}
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    ),
+                },
+              ]}
+            />
+            <Pagination total={page.total} limit={paging.limit} offset={paging.offset} onChange={paging.setOffset} />
+          </>
+        )}
+      </Loaded>
+    </Card>
+  )
+}
+
 function Datasets() {
   const datasets = useDatasets()
   const [chosen, setChosen] = useState<string | undefined>()
@@ -100,8 +173,11 @@ export function Classifier() {
   return (
     <>
       <PageHeader title="Classifier" />
-      <p className="mb-4 text-sm text-stone-500">Datasets are shared by every server that uses the same model. Recent guesses are for this server.</p>
+      <p className="mb-4 text-sm text-stone-500">Datasets are shared by every server that uses the same model. Recent drops and guesses are for this server.</p>
       <Datasets />
+      <div className="mt-4">
+        <RecentDrops />
+      </div>
       <div className="mt-4">
         <RecentGuesses />
       </div>

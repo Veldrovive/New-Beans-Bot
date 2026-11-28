@@ -1,7 +1,7 @@
 """
 The image classifier.
 
-- Per guild: the bot's recent guesses, and what members said about them.
+- Per guild: the bot's recent guesses and what members said about them, and the photo drops members made.
 - Per dataset (global, since several guilds can share a model): the photos, their labels and train/val
   split, uploads, retraining and each retrain's scores. Photo files are served as they're stored, or as
   thumbnails made on first request.
@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from beans_bot.db.models import ClassifierImage, ClassifierImageSource, ClassifierSplit, ClassifierTrainingRun
+from beans_bot.db.types import utcnow
 from beans_bot.services.classifier import InvalidLabel, NotAnImage, RetrainFailed, RetrainInProgress
 from beans_bot.services.photos import MAX_UPLOAD
 from beans_bot.web.actions import logger
@@ -62,6 +63,54 @@ async def guesses(guild_id: int, ctx: Ctx, _: Guild, page: Paged) -> Page[GuessO
                 corrected_at=g.correction.corrected_at if g.correction else None,
             )
             for g in rows
+        ],
+        total=total,
+    )
+
+
+class DropPhoto(BaseModel):
+    id: int
+    label: str  # As it is now. An admin may have relabelled it since the drop.
+    removed: bool
+
+
+class DropOut(BaseModel):
+    id: int
+    user_id: Snowflake
+    classifier_name: str
+    dataset: str
+    label: str  # The cat the member said the photos were of
+    started_at: datetime.datetime
+    ended_at: datetime.datetime | None
+    open: bool
+    kept: int
+    duplicates: int
+    failed: int
+    photos: list[DropPhoto]
+
+
+@guild_router.get("/drops")
+async def drops(guild_id: int, ctx: Ctx, _: Guild, page: Paged) -> Page[DropOut]:
+    rows, total = await ctx.services.reports.classifier_drops(guild_id, page.limit, page.offset)
+    now = utcnow()
+    return Page(
+        items=[
+            DropOut(
+                id=d.session.id or 0,
+                user_id=d.session.user_id,
+                classifier_name=d.session.classifier_name,
+                dataset=d.session.dataset,
+                label=d.session.label,
+                started_at=d.session.started_at,
+                # An expired drop the timer hasn't closed yet ended when it expired.
+                ended_at=d.session.ended_at or (None if d.session.is_open(now) else d.session.expires_at()),
+                open=d.session.is_open(now),
+                kept=d.session.kept,
+                duplicates=d.session.duplicates,
+                failed=d.session.failed,
+                photos=[DropPhoto(id=p.id or 0, label=p.label, removed=p.removed_at is not None) for p in d.photos],
+            )
+            for d in rows
         ],
         total=total,
     )

@@ -569,6 +569,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/guilds/{guild_id}/classifier/drops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Drops */
+        get: operations["drops_api_guilds__guild_id__classifier_drops_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/classifier/datasets": {
         parameters: {
             query?: never;
@@ -1096,6 +1113,45 @@ export interface components {
             /** Message */
             message: string;
         };
+        /** DropOut */
+        DropOut: {
+            /** Id */
+            id: number;
+            /** User Id */
+            user_id: string;
+            /** Classifier Name */
+            classifier_name: string;
+            /** Dataset */
+            dataset: string;
+            /** Label */
+            label: string;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Open */
+            open: boolean;
+            /** Kept */
+            kept: number;
+            /** Duplicates */
+            duplicates: number;
+            /** Failed */
+            failed: number;
+            /** Photos */
+            photos: components["schemas"]["DropPhoto"][];
+        };
+        /** DropPhoto */
+        DropPhoto: {
+            /** Id */
+            id: number;
+            /** Label */
+            label: string;
+            /** Removed */
+            removed: boolean;
+        };
         /** EaterOut */
         EaterOut: {
             /** User Id */
@@ -1465,6 +1521,13 @@ export interface components {
         Page_BirthdayOut_: {
             /** Items */
             items: components["schemas"]["BirthdayOut"][];
+            /** Total */
+            total: number;
+        };
+        /** Page[DropOut] */
+        Page_DropOut_: {
+            /** Items */
+            items: components["schemas"]["DropOut"][];
             /** Total */
             total: number;
         };
@@ -2952,6 +3015,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Page_GuessOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    drops_api_guilds__guild_id__classifier_drops_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                guild_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_DropOut_"];
                 };
             };
             /** @description Validation Error */

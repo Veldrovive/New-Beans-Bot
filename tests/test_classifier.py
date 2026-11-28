@@ -483,16 +483,19 @@ async def add_photos(classifier, count, start_at=0):
         await classifier.add_image("cats", png((i, 100, 200)), label="bean", original_name=None, source="upload")
 
 
-async def due(classifier, *, min_changes=2, after=datetime.timedelta(hours=2), interval=INTERVAL):
-    return await classifier.retrain_due("cats", min_changes=min_changes, quiet_period=QUIET, min_interval=interval, now=utcnow() + after)
+async def due(classifier, *, after=datetime.timedelta(hours=2), interval=INTERVAL):
+    return await classifier.retrain_due("cats", quiet_period=QUIET, min_interval=interval, now=utcnow() + after)
 
 
-async def test_retrain_due_needs_enough_changes(classifier):
+async def test_retrain_due_needs_a_change(classifier):
     assert not await due(classifier)
     await add_photos(classifier, 1)
-    assert not await due(classifier)
-    await add_photos(classifier, 1, start_at=1)
     assert await due(classifier)  # With no run yet, every photo counts
+    run = await classifier.start_run("cats", "auto")
+    await classifier.finish_run(run.id or 0, train_count=1, val_count=0, accuracy=None, log_loss=None, results={})
+    assert not await due(classifier)  # Nothing changed since that run
+    await add_photos(classifier, 1, start_at=1)
+    assert await due(classifier)  # One photo is enough
 
 
 async def test_retrain_due_waits_for_the_quiet_period(classifier):
@@ -518,12 +521,10 @@ async def test_retrain_due_waits_for_the_interval_and_running_runs(classifier):
     assert await due(classifier, after=INTERVAL + datetime.timedelta(minutes=1))
 
 
-async def test_failed_run_is_not_retried_until_more_photos_change(classifier):
+async def test_failed_run_is_not_retried_until_a_photo_changes(classifier):
     await add_photos(classifier, 2)
     run = await classifier.start_run("cats", "auto")
     await classifier.fail_run(run.id or 0, "boom")
-    assert not await due(classifier)
-    await add_photos(classifier, 1, start_at=2)
     assert not await due(classifier)
     await classifier.update_images([1], removed=True)  # Removing a photo is a change too
     assert await due(classifier)

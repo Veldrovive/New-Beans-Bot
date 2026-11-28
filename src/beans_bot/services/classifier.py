@@ -15,7 +15,7 @@ The image classifier's photos, corrections and retraining records.
   session ends when they run /photos done or go quiet.
 - Retraining needs torch, so the classifier cog does it and registers itself here as `retrainer`. That's
   how /admin retrain and the website reach it. Each retrain is recorded with its scores on the val photos.
-- Models with auto retrain on are retrained by the cog once `retrain_due` says enough photos changed, the
+- Models with auto retrain on are retrained by the cog once `retrain_due` says a photo changed, the
   changes have stopped, no drop is open and the last run was a while ago.
 """
 
@@ -791,13 +791,12 @@ class ClassifierService:
         self,
         dataset: str,
         *,
-        min_changes: int,
         quiet_period: datetime.timedelta,
         min_interval: datetime.timedelta,
         now: datetime.datetime | None = None,
     ) -> bool:
         """
-        Whether auto retrain should retrain this dataset now: enough photos changed since the newest run of
+        Whether auto retrain should retrain this dataset now: a photo was added, changed or removed since the newest run of
         any status started (so a failed run isn't retried until more change), the changes have stopped for
         `quiet_period`, no drop is open, the newest run started `min_interval` ago, and nothing is retraining.
         """
@@ -821,7 +820,7 @@ class ClassifierService:
             return False
         # With no run yet, every photo counts.
         changed = total if newest is None else await self.changed_since(dataset, newest.started_at)
-        if changed < min_changes:
+        if changed == 0:
             return False
         newest_change = max((t for t in (last_added, last_updated) if t is not None), default=None)
         if newest_change is not None and now - newest_change < quiet_period:

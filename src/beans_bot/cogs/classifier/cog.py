@@ -15,7 +15,7 @@ channels, or anywhere when someone reacts with the model's trigger emoji.
   quiet for the idle timeout, and the bot DMs a summary. A DM that just says "done" ends it too.
 - A retrain (from /admin retrain, the website, or auto retrain) trains a dataset's model on its train photos,
   scores it on its val photos and records both, in a background thread, then swaps the new model in. See
-  training.py. Models with an `auto_retrain` section are retrained by a timer once enough photos changed.
+  training.py. Models with an `auto_retrain` section are retrained by a timer once photos changed and things went quiet.
 """
 
 from __future__ import annotations
@@ -814,7 +814,7 @@ class ClassifierCog(BeansCog):
         for dataset, settings in self.auto_retrain_settings.items():
             try:
                 due = await self.services.classifier.retrain_due(
-                    dataset, min_changes=settings.min_changes, quiet_period=settings.quiet_period, min_interval=settings.min_interval
+                    dataset, quiet_period=settings.quiet_period, min_interval=settings.min_interval
                 )
                 if due:
                     self.logger.info(f"Auto retraining {dataset}")
