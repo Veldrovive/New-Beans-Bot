@@ -957,12 +957,6 @@ export interface components {
             file: string;
             /** Label */
             label: string;
-            /**
-             * Split
-             * @default auto
-             * @enum {string}
-             */
-            split: "auto" | "train" | "val";
         };
         /** BotUser */
         BotUser: {
@@ -977,8 +971,6 @@ export interface components {
         BulkChange: {
             /** Label */
             label?: string | null;
-            /** Split */
-            split?: ("train" | "val") | null;
             /** Removed */
             removed?: boolean | null;
             /** Ids */
@@ -1302,8 +1294,6 @@ export interface components {
         ImageChange: {
             /** Label */
             label?: string | null;
-            /** Split */
-            split?: ("train" | "val") | null;
             /** Removed */
             removed?: boolean | null;
         };
@@ -1319,8 +1309,6 @@ export interface components {
             original_name: string | null;
             /** Label */
             label: string;
-            /** Split */
-            split: string;
             /** Source */
             source: string;
             /** Guild Id */
@@ -1357,10 +1345,8 @@ export interface components {
         LabelCount: {
             /** Label */
             label: string;
-            /** Train */
-            train: number;
-            /** Val */
-            val: number;
+            /** Photos */
+            photos: number;
             /** Removed */
             removed: number;
         };
@@ -1714,6 +1700,11 @@ export interface components {
             finished_at: string | null;
             /** Error */
             error: string | null;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "cross_validation" | "holdout";
             /** Train Count */
             train_count: number | null;
             /** Val Count */
@@ -1746,6 +1737,11 @@ export interface components {
             finished_at: string | null;
             /** Error */
             error: string | null;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "cross_validation" | "holdout";
             /** Train Count */
             train_count: number | null;
             /** Val Count */
@@ -3086,7 +3082,6 @@ export interface operations {
         parameters: {
             query?: {
                 label?: string | null;
-                split?: ("train" | "val") | null;
                 source?: ("seed" | "correction" | "upload" | "drop") | null;
                 removed?: boolean | null;
                 limit?: number;

@@ -2,8 +2,8 @@
 The image classifier.
 
 - Per guild: the bot's recent guesses and what members said about them, and the photo drops members made.
-- Per dataset (global, since several guilds can share a model): the photos, their labels and train/val
-  split, uploads, retraining and each retrain's scores. Photo files are served as they're stored, or as
+- Per dataset (global, since several guilds can share a model): the photos, their labels,
+  uploads, retraining and each retrain's cross validation scores. Photo files are served as they're stored, or as
   thumbnails made on first request.
 """
 
@@ -17,7 +17,7 @@ from fastapi import APIRouter, File, Form, Query, Request, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from beans_bot.db.models import ClassifierImage, ClassifierImageSource, ClassifierSplit, ClassifierTrainingRun
+from beans_bot.db.models import ClassifierImage, ClassifierImageSource, ClassifierTrainingRun
 from beans_bot.db.types import utcnow
 from beans_bot.services.classifier import InvalidLabel, NotAnImage, RetrainFailed, RetrainInProgress
 from beans_bot.services.photos import MAX_UPLOAD
@@ -128,8 +128,7 @@ class GuildModel(BaseModel):
 
 class LabelCount(BaseModel):
     label: str
-    train: int
-    val: int
+    photos: int
     removed: int
 
 
@@ -147,8 +146,11 @@ class RunSummary(BaseModel):
     started_at: datetime.datetime
     finished_at: datetime.datetime | None
     error: str | None
+    # How it was scored: "cross_validation" (every photo, by a model that didn't train on it) or, for older
+    # runs, "holdout" (a fixed val set). The two kinds of score don't compare.
+    method: Literal["cross_validation", "holdout"]
     train_count: int | None
-    val_count: int | None
+    val_count: int | None  # Photos scored
     accuracy: float | None
     log_loss: float | None
 
@@ -173,7 +175,6 @@ class ImageOut(BaseModel):
     content_hash: str
     original_name: str | None
     label: str
-    split: str
     source: str
     guild_id: Snowflake | None
     channel_id: Snowflake | None  # Where the bot saw it, for corrections. Links to the Discord message.
@@ -191,7 +192,6 @@ class Uploaded(BaseModel):
 
 class ImageChange(BaseModel):
     label: str | None = None
-    split: Literal["train", "val"] | None = None
     removed: bool | None = None
 
 
@@ -214,8 +214,12 @@ class Progress(BaseModel):
     total: int
 
 
+def _method(run: ClassifierTrainingRun) -> Literal["cross_validation", "holdout"]:
+    return "cross_validation" if (run.results or {}).get("method") == "cross_validation" else "holdout"
+
+
 def _summary(run: ClassifierTrainingRun) -> RunSummary:
-    return RunSummary(**run.model_dump(exclude={"results"}))
+    return RunSummary(**run.model_dump(exclude={"results"}), method=_method(run))
 
 
 def configured_datasets(ctx: WebContext) -> dict[str, list[GuildModel]]:
@@ -273,14 +277,13 @@ async def images(
     dataset: str,
     ctx: Ctx,
     label: str | None = None,
-    split: Literal["train", "val"] | None = None,
     source: Literal["seed", "correction", "upload", "drop"] | None = None,
     removed: bool | None = False,
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
 ) -> Page[ImageOut]:
     await _dataset(ctx, dataset)
-    rows, total = await ctx.services.classifier.images(dataset, label=label, split=split, source=source, removed=removed, limit=limit, offset=offset)
+    rows, total = await ctx.services.classifier.images(dataset, label=label, source=source, removed=removed, limit=limit, offset=offset)
     return Page(items=await _images_out(ctx, rows), total=total)
 
 
@@ -306,7 +309,6 @@ async def upload(
     actor: Actor,
     file: UploadFile = File(),
     label: str = Form(),
-    split: Literal["auto", "train", "val"] = Form("auto"),
 ) -> Uploaded:
     """One photo per request: Cloudflare caps a request at 100 MB."""
     await _dataset(ctx, dataset)
@@ -320,7 +322,6 @@ async def upload(
             label=label,
             original_name=file.filename,
             source=ClassifierImageSource.UPLOAD,
-            split=None if split == "auto" else ClassifierSplit(split),
         )
     except NotAnImage:
         raise bad_request(f"{file.filename or 'That file'} isn't a photo I can open.")
@@ -333,7 +334,7 @@ async def upload(
 
 async def _change(ctx: WebContext, ids: list[int], change: ImageChange) -> int:
     try:
-        return await ctx.services.classifier.update_images(ids, label=change.label, split=change.split, removed=change.removed)
+        return await ctx.services.classifier.update_images(ids, label=change.label, removed=change.removed)
     except InvalidLabel:
         raise bad_request("Labels are up to 32 lowercase letters, numbers, dashes and underscores, starting with a letter or number.")
 
@@ -423,4 +424,4 @@ async def run(run_id: int, ctx: Ctx) -> RunDetail:
     found = await ctx.services.classifier.run(run_id)
     if found is None:
         raise not_found(f"There's no training run {run_id}.")
-    return RunDetail(**found.model_dump())
+    return RunDetail(**found.model_dump(), method=_method(found))

@@ -9,7 +9,7 @@ Admin tools, for server admins. Every reply here is ephemeral, so nobody sees wh
 - /admin give and /admin take add or remove a member's coins or ShadowBeans. The house is the
   other side, so coins never appear from nowhere or vanish. The member isn't told.
 - /admin retrain retrains each of the server's classifier models that takes corrections, on its dataset's
-  train photos, and reports how each scored on its val photos. It runs in the background. The website
+  photos, and reports how each scored in cross validation. It runs in the background. The website
   can retrain one dataset at a time too, and models with auto retrain on retrain themselves.
 """
 
@@ -204,7 +204,7 @@ class AdminCog(BeansCog):
                 self.logger.exception(f"Retrain of {dataset} failed in guild {interaction.guild_id}")
                 lines.append(f"- **{dataset}**: I studied so hard that something broke. My brain is unchanged. The logs know why.")
             else:
-                score = f"{run.accuracy:.0%} right on {run.val_count} val photos" if run.accuracy is not None else "no val photos to grade me on"
+                score = f"{run.accuracy:.0%} right when quizzed on {run.val_count} of them I hadn't studied" if run.accuracy is not None else "nothing to quiz me on"
                 lines.append(f"- **{dataset}**: trained on {run.train_count} photos, {score}")
         report = "\n".join(["Class dismissed. Report card:", *lines])[:2000]
         try:

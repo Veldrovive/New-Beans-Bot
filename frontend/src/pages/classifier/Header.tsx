@@ -6,7 +6,7 @@ import { ActionButton } from '../../components/ConfirmDialog'
 import { useToast } from '../../components/Toasts'
 import { Badge, Card, Stat } from '../../components/ui'
 import { Time } from '../../components/Time'
-import { CLASSIFIER, percent, type Dataset, type RunSummary } from './api'
+import { CLASSIFIER, percent, scoreText, type Dataset, type RunSummary } from './api'
 
 /** Which model is in use, the latest scores, and the Retrain button with its progress bar. */
 export function DatasetHeader({ dataset }: { dataset: Dataset }) {
@@ -25,7 +25,7 @@ export function DatasetHeader({ dataset }: { dataset: Dataset }) {
     if (wasRunning.current && !running) {
       api<Schemas['Page_RunSummary_']>('GET', `/api/classifier/datasets/${dataset.name}/runs?limit=1`).then((page) => {
         const run: RunSummary | undefined = page.items[0]
-        if (run?.status === 'succeeded') toast('ok', `Retrained ${dataset.name}: ${run.accuracy === null ? 'no val photos to score' : `${percent(run.accuracy)} right on ${run.val_count} val photos`}.`)
+        if (run?.status === 'succeeded') toast('ok', `Retrained ${dataset.name}: ${scoreText(run)}.`)
         else if (run) toast('error', `Retraining ${dataset.name} failed: ${run.error ?? 'unknown error'}`)
       })
       queryClient.invalidateQueries({ queryKey: CLASSIFIER })
@@ -59,8 +59,9 @@ export function DatasetHeader({ dataset }: { dataset: Dataset }) {
           title={`Retrain ${dataset.name}`}
           description={
             <p>
-              The bot trains a new model on every train photo that isn't removed, scores it on the val photos, and starts using it. It runs in the
-              background; the old model keeps guessing until it's done. Nothing is posted in Discord.
+              The bot scores the dataset by cross validation (every photo is guessed by a model that didn't train on it), then trains a new model
+              on every photo that isn't removed and starts using it. It runs in the background; the old model keeps guessing until it's done.
+              Nothing is posted in Discord.
             </p>
           }
           confirmLabel="Retrain"
@@ -86,12 +87,10 @@ export function DatasetHeader({ dataset }: { dataset: Dataset }) {
         </p>
       ) : null}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <Stat label="Val accuracy">{run ? percent(run.accuracy) : 'never retrained'}</Stat>
+        <Stat label={run?.method === 'holdout' ? 'Val accuracy' : 'Accuracy'}>{run ? percent(run.accuracy) : 'never retrained'}</Stat>
         <Stat label="Log loss">{run?.log_loss?.toFixed(3) ?? '-'}</Stat>
         <Stat label="Trained">{run ? <Time value={run.finished_at} /> : '-'}</Stat>
-        <Stat label="Photos">
-          {dataset.labels.reduce((n, l) => n + l.train + l.val, 0)} ({dataset.labels.reduce((n, l) => n + l.val, 0)} val)
-        </Stat>
+        <Stat label="Photos">{dataset.labels.reduce((n, l) => n + l.photos, 0)}</Stat>
       </div>
       {dataset.model && dataset.model.labels.length > 0 && <p className="mt-3 text-sm text-stone-600">Model labels: {dataset.model.labels.join(', ')}</p>}
       {dataset.guilds.length > 0 && (

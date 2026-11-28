@@ -2,10 +2,9 @@
 The image classifier's photos, corrections and retraining records.
 
 - Each model (a dataset, named by its `model_path`: "cats", "emotions") has a set of photos in the
-  classifier_image table, each with a label and a split: "train" photos teach the model, "val" photos
-  score it. The files are shrunk JPEGs under `datasets_dir`. The admin website manages them: upload,
-  relabel, move between train and val, remove and restore.
-- A new photo's split is decided by its hash alone, so it never changes by accident.
+  classifier_image table, each with a label. Every photo that isn't removed teaches the model, and
+  every one is scored by cross validation (see cogs/classifier/training.py). The files are shrunk JPEGs
+  under `datasets_dir`. The admin website manages them: upload, relabel, remove and restore.
 - Any member can say what a classified photo really shows, or confirm that the bot got it right. Either
   way its photos join the dataset under that label. Correcting a post again moves them to the new label.
 - A member can also name a cat the model has never heard of. That starts a new label, and the name is
@@ -14,7 +13,7 @@ The image classifier's photos, corrections and retraining records.
   Each photo joins the dataset under the session's label. A member can add only so many a day, and the
   session ends when they run /photos done or go quiet.
 - Retraining needs torch, so the classifier cog does it and registers itself here as `retrainer`. That's
-  how /admin retrain and the website reach it. Each retrain is recorded with its scores on the val photos.
+  how /admin retrain and the website reach it. Each retrain is recorded with its cross validation scores.
 - Models with auto retrain on are retrained by the cog once `retrain_due` says a photo changed, the
   changes have stopped, no drop is open and the last run was a while ago.
 """
@@ -42,7 +41,6 @@ from beans_bot.db.models import (
     ClassifierImage,
     ClassifierImageSource,
     ClassifierProcessedMessage,
-    ClassifierSplit,
     ClassifierTrainingRun,
 )
 from beans_bot.db.types import utcnow
@@ -158,10 +156,9 @@ def prepare_photo(data: bytes, original_name: str | None = None) -> Photo:
 
 
 class ClassifierService:
-    def __init__(self, db: Database, datasets_dir: Path, val_fraction: float = 0.2):
+    def __init__(self, db: Database, datasets_dir: Path):
         self.db = db
         self.datasets_dir = datasets_dir
-        self.val_fraction = val_fraction
         # Retrains one dataset: (dataset, triggered_by). None while the classifier cog isn't loaded.
         self.retrainer: Callable[[str, str], Awaitable[ClassifierTrainingRun]] | None = None
         # What model the bot is using for a dataset: loaded, source ("retrained" or "shipped"), labels.
@@ -191,10 +188,6 @@ class ClassifierService:
         """Embeddings of the stored photos, keyed by content_hash. Written by the classifier cog."""
         return self.datasets_dir / "embeddings.pkl"
 
-    def default_split(self, content_hash: str) -> str:
-        """Decided by the photo alone, so it never changes."""
-        return ClassifierSplit.VAL if int(content_hash[:8], 16) / 0xFFFFFFFF < self.val_fraction else ClassifierSplit.TRAIN
-
     def _write(self, image: ClassifierImage, jpeg: bytes) -> None:
         path = self.image_path(image)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -214,7 +207,6 @@ class ClassifierService:
         *,
         label: str,
         source: str,
-        split: str | None,
         guild_id: int | None = None,
         message_id: int | None = None,
         added_by: int | None = None,
@@ -231,8 +223,6 @@ class ClassifierService:
             existing.label = label
             existing.removed_at = None
             existing.updated_at = utcnow()
-            if split is not None:
-                existing.split = split
             session.add(existing)
             if not self.image_path(existing).exists():
                 await asyncio.to_thread(self._write, existing, photo.jpeg)
@@ -243,7 +233,6 @@ class ClassifierService:
             filename=f"{photo.content_hash}.jpg",
             original_name=photo.original_name,
             label=label,
-            split=split or self.default_split(photo.content_hash),
             source=source,
             guild_id=guild_id,
             message_id=message_id,
@@ -330,7 +319,6 @@ class ClassifierService:
                     photo,
                     label=label,
                     source=ClassifierImageSource.CORRECTION,
-                    split=None,
                     guild_id=guild_id,
                     message_id=message_id,
                     added_by=corrected_by,
@@ -412,7 +400,6 @@ class ClassifierService:
         label: str,
         original_name: str | None,
         source: str,
-        split: str | None = None,
         guild_id: int | None = None,
         message_id: int | None = None,
         added_by: int | None = None,
@@ -425,7 +412,7 @@ class ClassifierService:
         label = normalize_label(label)
         photo = await asyncio.to_thread(prepare_photo, data, original_name)
         return await self.add_prepared(
-            dataset, photo, label=label, source=source, split=split, guild_id=guild_id, message_id=message_id, added_by=added_by
+            dataset, photo, label=label, source=source, guild_id=guild_id, message_id=message_id, added_by=added_by
         )
 
     async def add_prepared(
@@ -435,7 +422,6 @@ class ClassifierService:
         *,
         label: str,
         source: str,
-        split: str | None = None,
         guild_id: int | None = None,
         message_id: int | None = None,
         added_by: int | None = None,
@@ -445,7 +431,7 @@ class ClassifierService:
         label = normalize_label(label)
         async with self.db.transaction() as session:
             return await self._add(
-                session, dataset, photo, label=label, source=source, split=split, guild_id=guild_id, message_id=message_id, added_by=added_by
+                session, dataset, photo, label=label, source=source, guild_id=guild_id, message_id=message_id, added_by=added_by
             )
 
     async def has_hash(self, dataset: str, content_hash: str) -> bool:
@@ -457,7 +443,6 @@ class ClassifierService:
         dataset: str,
         *,
         label: str | None = None,
-        split: str | None = None,
         source: str | None = None,
         removed: bool | None = False,
         limit: int = 100,
@@ -467,8 +452,6 @@ class ClassifierService:
         query = select(ClassifierImage).where(ClassifierImage.dataset == dataset)
         if label is not None:
             query = query.where(ClassifierImage.label == label)
-        if split is not None:
-            query = query.where(ClassifierImage.split == split)
         if source is not None:
             query = query.where(ClassifierImage.source == source)
         if removed is True:
@@ -484,13 +467,11 @@ class ClassifierService:
         async with self.db.transaction() as session:
             return await session.get(ClassifierImage, image_id)
 
-    async def update_images(self, ids: list[int], *, label: str | None = None, split: str | None = None, removed: bool | None = None) -> int:
-        """Relabel, move between train and val, remove or restore photos. Returns how many changed. Raises InvalidLabel."""
+    async def update_images(self, ids: list[int], *, label: str | None = None, removed: bool | None = None) -> int:
+        """Relabel, remove or restore photos. Returns how many changed. Raises InvalidLabel."""
         values: dict[str, Any] = {}
         if label is not None:
             values["label"] = normalize_label(label)
-        if split is not None:
-            values["split"] = ClassifierSplit(split).value
         if not ids or (not values and removed is None):
             return 0
         now = utcnow()
@@ -507,17 +488,16 @@ class ClassifierService:
         return changed
 
     async def label_counts(self, dataset: str) -> dict[str, dict[str, int]]:
-        """Per label: train and val photos, and how many were removed."""
+        """Per label: how many photos it has, and how many were removed."""
         counts: dict[str, dict[str, int]] = {}
         async with self.db.transaction() as session:
             result = await session.exec(
-                select(ClassifierImage.label, ClassifierImage.split, col(ClassifierImage.removed_at).is_not(None), func.count())
+                select(ClassifierImage.label, col(ClassifierImage.removed_at).is_not(None), func.count())
                 .where(ClassifierImage.dataset == dataset)
-                .group_by(col(ClassifierImage.label), col(ClassifierImage.split), col(ClassifierImage.removed_at).is_not(None))
+                .group_by(col(ClassifierImage.label), col(ClassifierImage.removed_at).is_not(None))
             )
-            for label, split, removed, count in result.all():
-                row = counts.setdefault(label, {"train": 0, "val": 0, "removed": 0})
-                row["removed" if removed else split] = row.get("removed" if removed else split, 0) + count
+            for label, removed, count in result.all():
+                counts.setdefault(label, {"photos": 0, "removed": 0})["removed" if removed else "photos"] = count
         return dict(sorted(counts.items()))
 
     async def datasets(self) -> list[str]:
@@ -656,7 +636,6 @@ class ClassifierService:
                     photo,
                     label=drop.label,
                     source=ClassifierImageSource.DROP,
-                    split=None,
                     guild_id=drop.guild_id,
                     added_by=drop.user_id,
                 )
@@ -726,7 +705,7 @@ class ClassifierService:
             run.finished_at = utcnow()
             run.train_count, run.val_count, run.accuracy, run.log_loss, run.results = train_count, val_count, accuracy, log_loss, results
             session.add(run)
-        logger.info(f"Retrained {run.dataset} (run {run_id}): {train_count} train, {val_count} val, accuracy {accuracy}")
+        logger.info(f"Retrained {run.dataset} (run {run_id}): {train_count} photos, {val_count} scored, accuracy {accuracy}")
         return run
 
     async def fail_run(self, run_id: int, error: str) -> None:

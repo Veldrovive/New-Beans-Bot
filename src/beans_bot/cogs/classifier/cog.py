@@ -13,8 +13,8 @@ channels, or anywhere when someone reacts with the model's trigger emoji.
   DMs as many photos as they like, and each message gets a tally. The bot opens the DM itself, so the
   member has somewhere to put them. It ends when they run /photos done (in the DM or the server) or go
   quiet for the idle timeout, and the bot DMs a summary. A DM that just says "done" ends it too.
-- A retrain (from /admin retrain, the website, or auto retrain) trains a dataset's model on its train photos,
-  scores it on its val photos and records both, in a background thread, then swaps the new model in. See
+- A retrain (from /admin retrain, the website, or auto retrain) scores a dataset by cross validation, trains
+  its model on every photo and records both, in a background thread, then swaps the new model in. See
   training.py. Models with an `auto_retrain` section are retrained by a timer once photos changed and things went quiet.
 """
 
@@ -750,7 +750,7 @@ class ClassifierCog(BeansCog):
 
     async def retrain(self, dataset: str, triggered_by: str) -> ClassifierTrainingRun:
         """
-        Retrains one dataset's model on its train photos, scores it on its val photos, and starts using it.
+        Retrains one dataset's model on its photos, scores it by cross validation, and starts using it.
         The work happens in a thread, so the bot keeps answering (and guessing) meanwhile. One at a time.
         """
         if self.retrain_lock.locked():
@@ -764,7 +764,7 @@ class ClassifierCog(BeansCog):
                 if not rows:
                     raise RetrainFailed(f"No photos have been imported for {dataset} yet. Run scripts/import_classifier_dataset.py.")
                 images = [
-                    training.TrainingImage(id=row.id or 0, path=service.image_path(row), label=row.label, split=row.split, content_hash=row.content_hash)
+                    training.TrainingImage(id=row.id or 0, path=service.image_path(row), label=row.label, content_hash=row.content_hash)
                     for row in rows
                 ]
                 service.progress[dataset] = (0, len(images))
@@ -790,7 +790,7 @@ class ClassifierCog(BeansCog):
                 raise
             finally:
                 service.progress.pop(dataset, None)
-            self.logger.info(f"Retrained {dataset} on {results.train_count} photos, val accuracy {results.accuracy}")
+            self.logger.info(f"Retrained {dataset} on {results.train_count} photos, cross validation accuracy {results.accuracy}")
             return finished
 
     # --- Auto retrain ----------------------------------------------------------------------

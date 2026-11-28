@@ -2100,26 +2100,6 @@
             }
           },
           {
-            "name": "split",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "enum": [
-                    "train",
-                    "val"
-                  ],
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Split"
-            }
-          },
-          {
             "name": "source",
             "in": "query",
             "required": false,
@@ -3145,16 +3125,6 @@
           "label": {
             "type": "string",
             "title": "Label"
-          },
-          "split": {
-            "type": "string",
-            "enum": [
-              "auto",
-              "train",
-              "val"
-            ],
-            "title": "Split",
-            "default": "auto"
           }
         },
         "type": "object",
@@ -3207,21 +3177,6 @@
               }
             ],
             "title": "Label"
-          },
-          "split": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "train",
-                  "val"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Split"
           },
           "removed": {
             "anyOf": [
@@ -4192,21 +4147,6 @@
             ],
             "title": "Label"
           },
-          "split": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "train",
-                  "val"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Split"
-          },
           "removed": {
             "anyOf": [
               {
@@ -4250,10 +4190,6 @@
           "label": {
             "type": "string",
             "title": "Label"
-          },
-          "split": {
-            "type": "string",
-            "title": "Split"
           },
           "source": {
             "type": "string",
@@ -4337,7 +4273,6 @@
           "content_hash",
           "original_name",
           "label",
-          "split",
           "source",
           "guild_id",
           "channel_id",
@@ -4387,13 +4322,9 @@
             "type": "string",
             "title": "Label"
           },
-          "train": {
+          "photos": {
             "type": "integer",
-            "title": "Train"
-          },
-          "val": {
-            "type": "integer",
-            "title": "Val"
+            "title": "Photos"
           },
           "removed": {
             "type": "integer",
@@ -4403,8 +4334,7 @@
         "type": "object",
         "required": [
           "label",
-          "train",
-          "val",
+          "photos",
           "removed"
         ],
         "title": "LabelCount"
@@ -5491,6 +5421,14 @@
             ],
             "title": "Error"
           },
+          "method": {
+            "type": "string",
+            "enum": [
+              "cross_validation",
+              "holdout"
+            ],
+            "title": "Method"
+          },
           "train_count": {
             "anyOf": [
               {
@@ -5557,6 +5495,7 @@
           "started_at",
           "finished_at",
           "error",
+          "method",
           "train_count",
           "val_count",
           "accuracy",
@@ -5610,6 +5549,14 @@
               }
             ],
             "title": "Error"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "cross_validation",
+              "holdout"
+            ],
+            "title": "Method"
           },
           "train_count": {
             "anyOf": [
@@ -5665,6 +5612,7 @@
           "started_at",
           "finished_at",
           "error",
+          "method",
           "train_count",
           "val_count",
           "accuracy",

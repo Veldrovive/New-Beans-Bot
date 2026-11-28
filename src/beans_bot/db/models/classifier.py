@@ -50,11 +50,6 @@ class ClassifierCorrection(SQLModel, table=True):
     corrected_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
 
 
-class ClassifierSplit(StrEnum):
-    TRAIN = "train"
-    VAL = "val"  # Held out to score each retrain
-
-
 class ClassifierImageSource(StrEnum):
     SEED = "seed"  # The original dataset from Aidan's Mac, brought in by scripts/import_classifier_dataset.py
     CORRECTION = "correction"  # A member confirmed or corrected the bot's guess in Discord
@@ -74,7 +69,6 @@ class ClassifierImage(SQLModel, table=True):
     filename: str  # "<content_hash>.jpg": the shrunk copy that is kept
     original_name: str | None = None
     label: str = Field(index=True)
-    split: str  # A ClassifierSplit
     source: str  # A ClassifierImageSource
     guild_id: int | None = None  # Set for corrections
     message_id: int | None = Field(default=None, index=True)
@@ -96,11 +90,12 @@ class ClassifierTrainingRun(SQLModel, table=True):
     started_at: datetime.datetime = Field(default_factory=utcnow, sa_type=UTCDateTime)
     finished_at: datetime.datetime | None = Field(default=None, sa_type=UTCDateTime)
     error: str | None = None
-    train_count: int | None = None
-    val_count: int | None = None
+    train_count: int | None = None  # Photos the model was trained on
+    val_count: int | None = None  # Photos it was scored on. Since cross validation, nearly all of them.
     accuracy: float | None = None
     log_loss: float | None = None
-    # labels, per_label, confusion, predictions, skipped, unseen_val_labels. See training.RunResults.
+    # method, folds, labels, per_label, confusion, predictions, skipped, unscored_labels. See training.RunResults.
+    # Runs from before cross validation have no method, and scored a held-out val set instead.
     results: dict | None = Field(default=None, sa_column=Column(JSON))
 
 

@@ -47,7 +47,6 @@ class ClassifierGlobalConfig(StrictModel):
     # Every model's photos, shrunk, as <model_path>/images/<hash>.jpg, indexed in the classifier_image table.
     # The website manages them, and retraining trains on them. Under data/ so it survives a rebuild.
     datasets_dir: Path = Path("data/classifier_datasets")
-    val_fraction: float = 0.2  # Share of new photos held out to score each retrain
     # Where corrected photos used to be saved. Only scripts/import_classifier_dataset.py --corrections reads it now.
     corrections_dir: Path = Path("data/classifier_corrections")
     # Models retrained by /admin retrain or the website are saved here. One of these is used instead of the one in models_dir.

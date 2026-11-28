@@ -17,32 +17,29 @@ def png(color, size=(64, 48)) -> bytes:
     return buffer.getvalue()
 
 
-async def upload(client, data, label="bean", split="auto", name="photo.png", dataset="cats"):
-    return await client.post(
-        f"/api/classifier/datasets/{dataset}/images", files={"file": (name, data, "image/png")}, data={"label": label, "split": split}
-    )
+async def upload(client, data, label="bean", name="photo.png", dataset="cats"):
+    return await client.post(f"/api/classifier/datasets/{dataset}/images", files={"file": (name, data, "image/png")}, data={"label": label})
 
 
 async def test_upload_list_and_duplicates(web_client):
-    response = await upload(web_client, png((10, 20, 30)), label="Mr Whiskers", split="val")
+    response = await upload(web_client, png((10, 20, 30)), label="Mr Whiskers")
     assert response.status_code == 200, response.text
     first = response.json()
     assert first["duplicate"] is False
     image = first["image"]
-    assert (image["label"], image["split"], image["source"], image["original_name"]) == ("mr_whiskers", "val", "upload", "photo.png")
+    assert (image["label"], image["source"], image["original_name"]) == ("mr_whiskers", "upload", "photo.png") and "split" not in image
 
     again = (await upload(web_client, png((10, 20, 30)), label="bean")).json()
     assert again["duplicate"] is True and again["image"]["id"] == image["id"] and again["image"]["label"] == "mr_whiskers"
-    await upload(web_client, png((40, 50, 60)), label="bean", split="train")
+    await upload(web_client, png((40, 50, 60)), label="bean")
 
     page = (await web_client.get("/api/classifier/datasets/cats/images")).json()
     assert page["total"] == 2
     assert [i["label"] for i in (await web_client.get("/api/classifier/datasets/cats/images", params={"label": "bean"})).json()["items"]] == ["bean"]
-    assert (await web_client.get("/api/classifier/datasets/cats/images", params={"split": "val"})).json()["total"] == 1
 
     (cats,) = (await web_client.get("/api/classifier/datasets")).json()
     assert cats["name"] == "cats" and cats["model"] is None and cats["latest_run"] is None and cats["running"] is False
-    assert {c["label"]: (c["train"], c["val"]) for c in cats["labels"]} == {"bean": (1, 0), "mr_whiskers": (0, 1)}
+    assert {c["label"]: (c["photos"], c["removed"]) for c in cats["labels"]} == {"bean": (1, 0), "mr_whiskers": (1, 0)}
     assert cats["guilds"] == [{"guild_id": str(GUILD), "guild_name": "Test", "model_name": "cats", "corrections": True}]
 
 
@@ -70,9 +67,8 @@ async def test_files_and_thumbnails(web_client, web_services):
 async def test_patch_and_bulk(web_client):
     a = (await upload(web_client, png((1, 0, 0)))).json()["image"]
     b = (await upload(web_client, png((2, 0, 0)))).json()["image"]
-    response = await web_client.patch(f"/api/classifier/images/{a['id']}", json={"label": "Andy", "split": "val"})
-    assert response.status_code == 200 and (response.json()["label"], response.json()["split"]) == ("andy", "val")
-    assert (await web_client.patch(f"/api/classifier/images/{a['id']}", json={"split": "test"})).status_code == 400
+    response = await web_client.patch(f"/api/classifier/images/{a['id']}", json={"label": "Andy"})
+    assert response.status_code == 200 and response.json()["label"] == "andy"
     assert (await web_client.patch(f"/api/classifier/images/{a['id']}", json={"label": "a/b"})).status_code == 400
     assert (await web_client.patch("/api/classifier/images/999", json={"removed": True})).status_code == 404
 
@@ -81,9 +77,9 @@ async def test_patch_and_bulk(web_client):
     assert (await web_client.get("/api/classifier/datasets/cats/images")).json()["total"] == 0
     removed = (await web_client.get("/api/classifier/datasets/cats/images", params={"removed": "true"})).json()
     assert removed["total"] == 2 and all(i["removed_at"] for i in removed["items"])
-    await web_client.post("/api/classifier/images/bulk", json={"ids": [a["id"]], "removed": False, "split": "train"})
+    await web_client.post("/api/classifier/images/bulk", json={"ids": [a["id"]], "removed": False})
     restored = (await web_client.get("/api/classifier/datasets/cats/images")).json()["items"]
-    assert [(i["id"], i["split"]) for i in restored] == [(a["id"], "train")]
+    assert [i["id"] for i in restored] == [a["id"]]
 
 
 async def test_corrections_link_to_their_message(web_client, web_services):
@@ -170,8 +166,15 @@ async def test_retrain_through_the_hook(web_client, web_services):
         await asyncio.sleep(0.02)
     runs = (await web_client.get("/api/classifier/datasets/cats/runs")).json()
     assert runs["total"] == 1 and "results" not in runs["items"][0]
+    assert runs["items"][0]["method"] == "holdout"  # No method in its results: a run from before cross validation
     detail = (await web_client.get(f"/api/classifier/runs/{run_id}")).json()
     assert (detail["status"], detail["triggered_by"], detail["accuracy"], detail["results"]) == ("succeeded", "web:aidan@example.com", 1.0, {"labels": ["a", "b"]})
     (cats,) = (await web_client.get("/api/classifier/datasets")).json()
     assert cats["latest_run"]["id"] == run_id and cats["changed_since_latest_run"] == 0
     assert (await web_client.get("/api/classifier/runs/999")).status_code == 404
+
+    crossed = await service.start_run("cats", "auto")
+    await service.finish_run(crossed.id or 0, train_count=4, val_count=4, accuracy=0.75, log_loss=0.4, results={"method": "cross_validation", "folds": 10})
+    (cats,) = (await web_client.get("/api/classifier/datasets")).json()
+    assert (cats["latest_run"]["id"], cats["latest_run"]["method"]) == (crossed.id, "cross_validation")
+    assert (await web_client.get(f"/api/classifier/runs/{crossed.id}")).json()["method"] == "cross_validation"

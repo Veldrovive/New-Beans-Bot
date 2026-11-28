@@ -4,7 +4,7 @@ import { Button } from '../../components/ui'
 import { changeImages, CLASSIFIER, type Change } from './api'
 import { LabelInput } from './LabelInput'
 
-/** Relabel, move between train and val, remove or restore one or more photos. Undoable, so no confirm step. */
+/** Relabel, remove or restore one or more photos. Undoable, so no confirm step. */
 export function QuickActions({
   ids,
   labels,
@@ -45,12 +45,6 @@ export function QuickActions({
           Move to label
         </Button>
       </form>
-      <Button disabled={disabled} onClick={() => run({ split: 'train' })}>
-        Set train
-      </Button>
-      <Button disabled={disabled} onClick={() => run({ split: 'val' })}>
-        Set val
-      </Button>
       {removed ? (
         <Button disabled={disabled} onClick={() => run({ removed: false })}>
           Restore

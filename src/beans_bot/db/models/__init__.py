@@ -8,7 +8,6 @@ from beans_bot.db.models.classifier import (
     ClassifierImageSource,
     ClassifierProcessedMessage,
     ClassifierScriptLastUsed,
-    ClassifierSplit,
     ClassifierTrainingRun,
 )
 from beans_bot.db.models.coins import CoinAccount, CoinTransaction, CoinTransactionKind
@@ -32,7 +31,6 @@ __all__ = [
     "ClassifierImageSource",
     "ClassifierProcessedMessage",
     "ClassifierScriptLastUsed",
-    "ClassifierSplit",
     "ClassifierTrainingRun",
     "CoinAccount",
     "CoinTransaction",

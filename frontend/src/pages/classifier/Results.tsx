@@ -58,7 +58,7 @@ function PredictionTile({ prediction, labels }: { prediction: Prediction; labels
   )
 }
 
-/** One run's scores: the numbers, a table per label, the confusion matrix and the val photos it got wrong. */
+/** One run's scores: the numbers, a table per label, the confusion matrix and the photos it got wrong. */
 export function Results({ dataset }: { dataset: Dataset }) {
   const runs = useRuns(dataset.name)
   const [chosen, setChosen] = useState<number | undefined>()
@@ -78,6 +78,7 @@ export function Results({ dataset }: { dataset: Dataset }) {
                 <option key={r.id} value={r.id} disabled={r.status !== 'succeeded'}>
                   #{r.id} {new Date(r.started_at).toLocaleString()} · {r.status}
                   {r.accuracy !== null ? ` · ${percent(r.accuracy)}` : ''}
+                  {r.status === 'succeeded' && r.method === 'holdout' ? ' (val set)' : ''}
                 </option>
               ))}
             </select>
@@ -92,34 +93,43 @@ export function Results({ dataset }: { dataset: Dataset }) {
           {(r) => {
             const results = r.results as RunResults | null
             if (!results) return <Empty>This run has no results{r.error ? `: ${r.error}` : ''}.</Empty>
-            const shown = cell
-              ? results.predictions.filter((p) => p.label === results.labels[cell[0]] && p.predicted === results.labels[cell[1]])
-              : results.predictions.filter((p) => !p.correct)
+            const cross = r.method === 'cross_validation'
+            const unscored = results.unscored_labels ?? []
+            const unseen = results.unseen_val_labels ?? []
+            // The surest mistakes first: a photo the model is certain about and "wrong" on is often mislabeled.
+            const sureness = (p: Prediction) => p.probabilities[p.predicted] ?? 0
+            const shown = (
+              cell
+                ? results.predictions.filter((p) => p.label === results.labels[cell[0]] && p.predicted === results.labels[cell[1]])
+                : results.predictions.filter((p) => !p.correct)
+            ).sort((a, b) => sureness(b) - sureness(a))
             return (
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
                   <Stat label="Accuracy">{percent(r.accuracy)}</Stat>
                   <Stat label="Log loss">{r.log_loss?.toFixed(3) ?? '-'}</Stat>
-                  <Stat label="Train photos">{r.train_count ?? '-'}</Stat>
-                  <Stat label="Val photos scored">{r.val_count ?? '-'}</Stat>
+                  <Stat label={cross ? 'Photos trained on' : 'Train photos'}>{r.train_count ?? '-'}</Stat>
+                  <Stat label={cross ? 'Photos scored' : 'Val photos scored'}>{r.val_count ?? '-'}</Stat>
                   <Stat label="Finished">
                     <Time value={r.finished_at} />
                   </Stat>
                 </div>
-                {(results.skipped.length > 0 || results.unseen_val_labels.length > 0) && (
-                  <p className="text-sm text-stone-600">
-                    {results.skipped.length > 0 && `${results.skipped.length} photo(s) couldn't be read. `}
-                    {results.unseen_val_labels.length > 0 && `Val photos of ${results.unseen_val_labels.join(', ')} weren't scored: those labels have no train photos.`}
-                  </p>
-                )}
+                <p className="text-sm text-stone-600">
+                  {cross
+                    ? `Scored by ${results.folds ?? 10}-fold cross validation: each photo was guessed by a model trained without it and without its look-alikes. The model in use is trained on all of them. `
+                    : "This older run scored a fixed val set the model didn't train on. Its scores don't compare with cross validated runs. "}
+                  {unscored.length > 0 && `${unscored.join(', ')} ${unscored.length === 1 ? 'has' : 'have'} one photo each, so ${unscored.length === 1 ? 'it trains' : 'they train'} the model but can't be scored. `}
+                  {results.skipped.length > 0 && `${results.skipped.length} photo(s) couldn't be read. `}
+                  {unseen.length > 0 && `Val photos of ${unseen.join(', ')} weren't scored: those labels have no train photos.`}
+                </p>
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   <DataTable
                     rows={results.labels}
                     rowKey={(l) => l}
                     columns={[
                       { key: 'label', header: 'Label', render: (l) => l },
-                      { key: 'train', header: 'Train', render: (l) => results.per_label[l].train, sort: (l) => results.per_label[l].train, className: 'text-right' },
-                      { key: 'val', header: 'Val', render: (l) => results.per_label[l].val, sort: (l) => results.per_label[l].val, className: 'text-right' },
+                      { key: 'train', header: cross ? 'Photos' : 'Train', render: (l) => results.per_label[l].train, sort: (l) => results.per_label[l].train, className: 'text-right' },
+                      { key: 'val', header: cross ? 'Scored' : 'Val', render: (l) => results.per_label[l].val, sort: (l) => results.per_label[l].val, className: 'text-right' },
                       { key: 'precision', header: 'Precision', render: (l) => percent(results.per_label[l].precision), sort: (l) => results.per_label[l].precision, className: 'text-right' },
                       { key: 'recall', header: 'Recall', render: (l) => percent(results.per_label[l].recall), sort: (l) => results.per_label[l].recall, className: 'text-right' },
                     ]}
@@ -131,7 +141,7 @@ export function Results({ dataset }: { dataset: Dataset }) {
                 </div>
                 <div>
                   <h3 className="mb-2 font-semibold">
-                    {cell ? `${results.labels[cell[0]]} guessed as ${results.labels[cell[1]]}` : 'Val photos it got wrong'} ({shown.length})
+                    {cell ? `${results.labels[cell[0]]} guessed as ${results.labels[cell[1]]}` : cross ? 'Photos it got wrong, surest first' : 'Val photos it got wrong'} ({shown.length})
                     {cell && (
                       <button className="ml-2 text-sm font-normal text-amber-800 hover:underline" onClick={() => setCell(null)}>
                         show every mistake
@@ -139,7 +149,7 @@ export function Results({ dataset }: { dataset: Dataset }) {
                     )}
                   </h3>
                   {shown.length === 0 ? (
-                    <Empty>Nothing here. {cell ? '' : 'A perfect score, or no val photos.'}</Empty>
+                    <Empty>Nothing here. {cell ? '' : 'A perfect score, or nothing to score.'}</Empty>
                   ) : (
                     <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
                       {shown.map((p) => (
@@ -171,9 +181,14 @@ export function RunHistory({ dataset }: { dataset: Dataset }) {
               { key: 'when', header: 'Started', render: (r) => <Time value={r.started_at} /> },
               { key: 'who', header: 'Started by', render: (r) => (r.triggered_by === 'auto' ? <Badge>auto retrain</Badge> : r.triggered_by) },
               { key: 'status', header: 'Status', render: (r) => <Badge color={r.status === 'succeeded' ? 'green' : r.status === 'failed' ? 'red' : 'amber'}>{r.status}</Badge> },
-              { key: 'train', header: 'Train', render: (r) => r.train_count ?? '', className: 'text-right' },
-              { key: 'val', header: 'Val', render: (r) => r.val_count ?? '', className: 'text-right' },
+              { key: 'train', header: 'Trained on', render: (r) => r.train_count ?? '', className: 'text-right' },
+              { key: 'val', header: 'Scored', render: (r) => r.val_count ?? '', className: 'text-right' },
               { key: 'accuracy', header: 'Accuracy', render: (r) => percent(r.accuracy), className: 'text-right' },
+              {
+                key: 'method',
+                header: 'Scored by',
+                render: (r) => (r.status !== 'succeeded' ? null : r.method === 'cross_validation' ? <Badge color="green">cross validation</Badge> : <Badge title="A fixed val set. Doesn't compare with cross validated runs.">val set</Badge>),
+              },
               { key: 'error', header: 'Error', render: (r) => <span className="text-xs text-red-700">{r.error ?? ''}</span> },
             ]}
           />

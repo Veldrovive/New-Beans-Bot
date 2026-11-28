@@ -79,7 +79,6 @@ async def test_correction_saves_photos_under_the_right_label(db, classifier, gue
     first, second = await rows(db)
     assert (first.source, first.guild_id, first.added_by, first.original_name) == ("correction", GUILD, 7, "IMG_1.JPG")
     assert first.content_hash == photos.content_hash(IMAGES[0][1]) and first.filename == f"{first.content_hash}.jpg"
-    assert first.split == classifier.default_split(first.content_hash)
     assert files(classifier) == sorted(f"cats/images/{r.filename}" for r in (first, second))
     assert all(p.read_bytes()[:3] == b"\xff\xd8\xff" for p in result.paths)  # Stored as JPEG
     (row,) = await corrections(db)
@@ -267,29 +266,21 @@ async def test_re_adding_a_removed_photo_restores_it_with_the_new_label(classifi
     assert added and restored.id == image.id and restored.label == "andy" and restored.removed_at is None
 
 
-async def test_default_split_is_stable_and_follows_the_fraction(classifier):
-    hashes = [photos.content_hash(bytes([i, j])) for i in range(40) for j in range(25)]
-    splits = [classifier.default_split(h) for h in hashes]
-    assert splits == [classifier.default_split(h) for h in hashes]
-    assert 0.15 < splits.count("val") / len(splits) < 0.25
-    assert classifier.default_split("00000000" + "0" * 24) == "val" and classifier.default_split("ffffffff" + "0" * 24) == "train"
-
-
 async def test_removed_photos_are_not_trained_on(classifier):
-    keep, _ = await classifier.add_image("cats", png((1, 0, 0)), label="bean", original_name=None, source="upload", split="train")
-    drop, _ = await classifier.add_image("cats", png((2, 0, 0)), label="bean", original_name=None, source="upload", split="val")
+    keep, _ = await classifier.add_image("cats", png((1, 0, 0)), label="bean", original_name=None, source="upload")
+    drop, _ = await classifier.add_image("cats", png((2, 0, 0)), label="bean", original_name=None, source="upload")
     assert drop.id is not None
     await classifier.update_images([drop.id], removed=True)
     assert [i.id for i in await classifier.training_images("cats")] == [keep.id]
-    assert await classifier.label_counts("cats") == {"bean": {"train": 1, "val": 0, "removed": 1}}
+    assert await classifier.label_counts("cats") == {"bean": {"photos": 1, "removed": 1}}
 
 
-async def test_update_images_relabels_moves_and_restores(classifier):
-    a, _ = await classifier.add_image("cats", png((1, 0, 0)), label="bean", original_name=None, source="upload", split="train")
-    b, _ = await classifier.add_image("cats", png((2, 0, 0)), label="bean", original_name=None, source="upload", split="train")
+async def test_update_images_relabels_and_restores(classifier):
+    a, _ = await classifier.add_image("cats", png((1, 0, 0)), label="bean", original_name=None, source="upload")
+    b, _ = await classifier.add_image("cats", png((2, 0, 0)), label="bean", original_name=None, source="upload")
     ids = [a.id or 0, b.id or 0]
-    assert await classifier.update_images(ids, label="Mr Whiskers", split="val") == 2
-    assert {(i.label, i.split) for i in await classifier.training_images("cats")} == {("mr_whiskers", "val")}
+    assert await classifier.update_images(ids, label="Mr Whiskers") == 2
+    assert {i.label for i in await classifier.training_images("cats")} == {"mr_whiskers"}
     with pytest.raises(InvalidLabel):
         await classifier.update_images(ids, label="../etc")
     assert await classifier.update_images(ids, removed=True) == 2
@@ -382,7 +373,7 @@ async def test_drop_keeps_photos_and_counts_them(db, classifier):
 
     (image,) = await rows(db)
     assert (image.source, image.label, image.guild_id, image.added_by, image.message_id) == ("drop", "bean", GUILD, MEMBER, None)
-    assert image.original_name == "IMG_9.HEIC" and image.split == classifier.default_split(image.content_hash)
+    assert image.original_name == "IMG_9.HEIC"
 
 
 async def test_drop_unreadable_counts_as_failed(classifier):

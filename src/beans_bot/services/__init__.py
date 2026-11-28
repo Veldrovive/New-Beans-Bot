@@ -59,7 +59,7 @@ class Services:
             snipes=SnipeService(db),
             manifesto=ManifestoService(config, db, vip),
             heists=HeistService(db, coins, vip),
-            classifier=ClassifierService(db, config.classifier.datasets_dir, config.classifier.val_fraction),
+            classifier=ClassifierService(db, config.classifier.datasets_dir),
             gemini=GeminiService(config.gemini),
             reports=ReportService(db, coins),
         )

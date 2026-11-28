@@ -23,8 +23,7 @@ gemini:
 classifier:
   enabled: true
   models_dir: models/classifier
-  datasets_dir: data/classifier_datasets  # The photos and their train/val split, managed on the website
-  val_fraction: 0.2
+  datasets_dir: data/classifier_datasets  # The photos, managed on the website
   corrections_dir: data/classifier_corrections  # Old corrections, for scripts/import_classifier_dataset.py
   retrained_dir: data/classifier_models
   device: cpu

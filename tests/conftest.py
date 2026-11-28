@@ -67,7 +67,7 @@ def reports(db, coins):
 
 @pytest.fixture
 def classifier(db, tmp_path):
-    return ClassifierService(db, tmp_path / "datasets", val_fraction=0.2)
+    return ClassifierService(db, tmp_path / "datasets")
 
 
 # --- Website ------------------------------------------------------------------------------

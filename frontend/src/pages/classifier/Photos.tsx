@@ -5,9 +5,9 @@ import type { Schemas } from '../../api/types'
 import { Modal } from '../../components/ConfirmDialog'
 import { Pagination } from '../../components/DataTable'
 import { discordUrl } from '../../components/Names'
-import { Badge, Button, Card, Empty, ErrorBox, Field, fieldClass, inputClass, Loading } from '../../components/ui'
+import { Badge, Button, Card, Empty, ErrorBox, Field, fieldClass, Loading } from '../../components/ui'
 import { Time } from '../../components/Time'
-import { CLASSIFIER, largeUrl, PAGE_SIZE, thumbUrl, useImages, type Dataset, type ImageRow } from './api'
+import { CLASSIFIER, largeUrl, PAGE_SIZE, thumbUrl, useImages, useLatestGuesses, type Dataset, type ImageRow } from './api'
 import { LabelInput } from './LabelInput'
 import { QuickActions } from './QuickActions'
 
@@ -17,7 +17,7 @@ const SOURCE_COLOR = { seed: 'stone', correction: 'blue', upload: 'purple', drop
 /** A photo opened large, with its details and the quick actions. */
 export function Lightbox({ image, labels, onClose }: { image: ImageRow | null; labels: string[]; onClose: () => void }) {
   return (
-    <Modal open={image !== null} title={image ? `${image.label} (${image.split})` : ''} onClose={onClose}>
+    <Modal open={image !== null} title={image ? image.label : ''} onClose={onClose}>
       {image && (
         <>
           <img src={largeUrl(image.id)} alt={image.label} className="max-h-[60vh] w-full rounded object-contain" />
@@ -48,7 +48,7 @@ function useUploads(dataset: string) {
   const queryClient = useQueryClient()
   const [results, setResults] = useState<UploadResult[]>([])
   const [busy, setBusy] = useState(false)
-  const upload = async (files: File[], label: string, split: string) => {
+  const upload = async (files: File[], label: string) => {
     setBusy(true)
     setResults(files.map((f) => ({ name: f.name, status: 'uploading' })))
     let next = 0
@@ -59,7 +59,6 @@ function useUploads(dataset: string) {
         const form = new FormData()
         form.append('file', file)
         form.append('label', label)
-        form.append('split', split)
         let result: UploadResult
         try {
           const r = await api<Schemas['Uploaded']>('POST', `/api/classifier/datasets/${dataset}/images`, form)
@@ -79,9 +78,8 @@ function useUploads(dataset: string) {
 
 function UploadPanel({ labels, label, setLabel, uploads }: { labels: string[]; label: string; setLabel: (l: string) => void; uploads: ReturnType<typeof useUploads> }) {
   const input = useRef<HTMLInputElement>(null)
-  const [split, setSplit] = useState('auto')
   const pick = (files: FileList | null) => {
-    if (files && files.length && label.trim()) uploads.upload(Array.from(files), label.trim(), split)
+    if (files && files.length && label.trim()) uploads.upload(Array.from(files), label.trim())
   }
   return (
     <div className="mb-3 rounded-lg border border-dashed border-stone-300 p-3 text-sm">
@@ -90,13 +88,6 @@ function UploadPanel({ labels, label, setLabel, uploads }: { labels: string[]; l
           <div className="w-44">
             <LabelInput value={label} onChange={setLabel} labels={labels} />
           </div>
-        </Field>
-        <Field label="Split">
-          <select className={inputClass} value={split} onChange={(e) => setSplit(e.target.value)}>
-            <option value="auto">automatic</option>
-            <option value="train">train</option>
-            <option value="val">val</option>
-          </select>
         </Field>
         <input ref={input} type="file" multiple accept="image/*,.heic,.heif" className="hidden" onChange={(e) => pick(e.target.files)} />
         <Button disabled={!label.trim() || uploads.busy} onClick={() => input.current?.click()}>
@@ -129,7 +120,6 @@ function UploadPanel({ labels, label, setLabel, uploads }: { labels: string[]; l
 /** The labels on the left and the thumbnail grid for the chosen one. */
 export function Photos({ dataset }: { dataset: Dataset }) {
   const [selectedLabel, setSelectedLabel] = useState<string | undefined>(dataset.labels[0]?.label)
-  const [split, setSplit] = useState('')
   const [source, setSource] = useState('')
   const [offset, setOffset] = useState(0)
   const [selected, setSelected] = useState<Set<number>>(new Set())
@@ -138,9 +128,10 @@ export function Photos({ dataset }: { dataset: Dataset }) {
   const [uploadLabel, setUploadLabel] = useState(dataset.labels[0]?.label ?? '')
   const [dragging, setDragging] = useState(false)
   const uploads = useUploads(dataset.name)
+  const guesses = useLatestGuesses(dataset)
 
   const removed = selectedLabel === REMOVED
-  const images = useImages(dataset.name, { label: removed ? undefined : selectedLabel, removed, split: split || undefined, source: source || undefined, offset })
+  const images = useImages(dataset.name, { label: removed ? undefined : selectedLabel, removed, source: source || undefined, offset })
   const labels = dataset.labels.map((l) => l.label)
   const rows = images.data?.items ?? []
 
@@ -181,9 +172,7 @@ export function Photos({ dataset }: { dataset: Dataset }) {
                 className={`flex w-full justify-between gap-2 rounded px-2 py-1 text-left hover:bg-stone-100 ${selectedLabel === l.label ? 'bg-amber-100 font-semibold' : ''}`}
               >
                 <span className="truncate">{l.label}</span>
-                <span className="text-xs whitespace-nowrap text-stone-500 tabular-nums">
-                  {l.train} / {l.val}
-                </span>
+                <span className="text-xs whitespace-nowrap text-stone-500 tabular-nums">{l.photos}</span>
               </button>
             </li>
           ))}
@@ -193,7 +182,6 @@ export function Photos({ dataset }: { dataset: Dataset }) {
               <span className="text-xs tabular-nums">{removedCount}</span>
             </button>
           </li>
-          <li className="px-2 pt-2 text-xs text-stone-400">train / val</li>
         </ul>
         <div
           className={`min-w-0 flex-1 rounded-lg ${dragging ? 'ring-4 ring-amber-400' : ''}`}
@@ -205,16 +193,11 @@ export function Photos({ dataset }: { dataset: Dataset }) {
           onDrop={(e) => {
             e.preventDefault()
             setDragging(false)
-            if (e.dataTransfer.files.length && uploadLabel.trim()) uploads.upload(Array.from(e.dataTransfer.files), uploadLabel.trim(), 'auto')
+            if (e.dataTransfer.files.length && uploadLabel.trim()) uploads.upload(Array.from(e.dataTransfer.files), uploadLabel.trim())
           }}
         >
           <UploadPanel labels={labels} label={uploadLabel} setLabel={setUploadLabel} uploads={uploads} />
           <div className="mb-3 flex flex-wrap items-center gap-2 text-sm">
-            <select className={fieldClass} value={split} onChange={(e) => { setSplit(e.target.value); setOffset(0) }}>
-              <option value="">train and val</option>
-              <option value="train">train only</option>
-              <option value="val">val only</option>
-            </select>
             <select className={fieldClass} value={source} onChange={(e) => { setSource(e.target.value); setOffset(0) }}>
               <option value="">every source</option>
               <option value="seed">seed</option>
@@ -256,7 +239,11 @@ export function Photos({ dataset }: { dataset: Dataset }) {
                     onClick={(e) => toggle(index, e.shiftKey)}
                   />
                   <figcaption className="flex flex-wrap items-center gap-1 p-1 text-xs">
-                    <Badge color={image.split === 'val' ? 'amber' : 'green'}>{image.split}</Badge>
+                    {guesses.get(image.id)?.correct === false && guesses.get(image.id)?.label === image.label && (
+                      <Badge color="red" title="What the latest retrain guessed for this photo, from a model that didn't train on it">
+                        guessed {guesses.get(image.id)?.predicted}
+                      </Badge>
+                    )}
                     {image.guild_id && image.channel_id && image.message_id ? (
                       <a href={discordUrl(image.guild_id, image.channel_id, image.message_id)} target="_blank" rel="noreferrer">
                         <Badge color={SOURCE_COLOR.correction}>correction</Badge>
